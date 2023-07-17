@@ -9,8 +9,8 @@
 ## COMPILE
 	make all
 ## RUN
-`./exe -parameters...`
+`./monas -parameters...`
 ## EXAMPLE
-./exe -Rd 0.1 -Rc 0.1 -k 0.1 -l 0.1 -a 0.1 -b 0.1 -r 0.1 -topasScorer ./Scorer.phsp
+./monas -Rd 0.1 -Rc 0.1 -k 0.1 -l 0.1 -a 0.1 -b 0.1 -r 0.1 -topasScorer ./Scorer.phsp
 ## HELP FOR INPUT PARAMETERS
-./exe -help
+./monas -help
