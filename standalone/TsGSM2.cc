@@ -20,8 +20,8 @@
 // Extra Class for TsYScorer
 
 // Claculate RBE 
-// Author: Hongyu Zhu
-// Date: 04/19/2019
+// Author: Giorgio Cartechini
+// Date: 
 
 #include "TsGSM2.hh"
 #include "TsSpecificEnergy.hh"
