@@ -1,5 +1,25 @@
 // Scorer for TsYScorer
 
+// *************************************************************************
+// * MONAS is a C++ package that calculates cell surviavl curvs and        *
+// * dose dependednt RBE from microdosimetric spectra.			   *
+// *									   *
+// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@miami.edu>	   *
+// * 									   *
+// * This program is free software: you can redistribute it and/or modify  *
+// * it under the terms of the GNU General Public License as published by  *
+// * the Free Software Foundation, either version 3 of the License, or     *
+// * (at your option) any later version.			           *
+// * 									   *
+// * This program is distributed in the hope that it will be useful,       *
+// * but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+// * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+// * GNU General Public License for more details.			   *
+// * 									   *
+// * You should have received a copy of the GNU General Public license     *
+// * along with this program.  If not, see <http://www.gnu.org/licenses/>. *
+// **************************************************************************
+
 // input
 //
 // mandatory parameters
@@ -216,12 +236,12 @@ G4bool TsYScorer::ProcessHits(G4Step* aStep,G4TouchableHistory*)
 	newHit->SetParticleName(ParticleName);
 
 	G4int flagParticle = -1;
-	if(aStep->GetTrack()->GetTrackID() == 1 && aStep->GetTrack()->GetParentID() == 0)
-		flagParticle = 1; //DEBUG
-	else
+	if(aStep->GetTrack()->GetTrackID() == 1 && aStep->GetTrack()->GetParentID() == 0) //if primary particle
+		flagParticle = 1; 
+	else // else secondary particle
 	{
 		if (ParticleName == "e-") flagParticle = 0;
-		else if (ParticleName == "proton")   flagParticle = 2; //DEBUG
+		else if (ParticleName == "proton")   flagParticle = 2;
 		else if (ParticleName == "deuteron") flagParticle = 2;
 		else if (ParticleName == "triton")   flagParticle = 2;
 		else if (ParticleName == "He3")      flagParticle = 3;
@@ -721,8 +741,8 @@ void TsYScorer::GetRBE()
 				G4double parameter = fPm->GetUnitlessParameter(GetFullParmName("MKModel_alpha0"));
 				aSurvRBEQf->SetMKModel_alpha0(parameter);
 			}
-			if ( fPm->ParameterExists(GetFullParmName("MKModel_beta")) ) {
-				G4double parameter = fPm->GetUnitlessParameter(GetFullParmName("MKModel_beta"));
+			if ( fPm->ParameterExists(GetFullParmName("MKModel_beta0")) ) {
+				G4double parameter = fPm->GetUnitlessParameter(GetFullParmName("MKModel_beta0"));
 				aSurvRBEQf->SetMKModel_beta(parameter);
 			}
 			if ( fPm->ParameterExists(GetFullParmName("MKModel_alphaX")) ) {
@@ -737,9 +757,11 @@ void TsYScorer::GetRBE()
 				G4double parameter = fPm->GetUnitlessParameter(GetFullParmName("MKModel_rho"));
 				aSurvRBEQf->SetMKModel_rho(parameter);
 			}
+			G4double MKMDomainRadius = 0.;
 			if ( fPm->ParameterExists(GetFullParmName("MKModel_DomainRadius")) ) {
 				G4double parameter = fPm->GetUnitlessParameter(GetFullParmName("MKModel_DomainRadius"));
 				aSurvRBEQf->SetMKModel_rd(parameter);
+				MKMDomainRadius = parameter;
 			}
 			G4double MKMNucleusRadius = 0.;
 			if ( fPm->ParameterExists(GetFullParmName("MKModel_NucleusRadius")) ) {
@@ -753,7 +775,7 @@ void TsYScorer::GetRBE()
 			}
 
 			if(fSaveSpecificEnergySpectra==true) {
-				OutputResultSpecificEnergy(MKMNucleusRadius, doses);
+				OutputResultSpecificEnergy(MKMNucleusRadius, MKMDomainRadius, doses);
 			}
 
 			if ( fPm->ParameterExists(GetFullParmName("MKMCalculation")) ) 
@@ -787,9 +809,11 @@ void TsYScorer::GetRBE()
 
 		if(fGetRBEWithGSM2==true)
 		{	
+			G4double GSM2DomainRadius = 0.;
 			if ( fPm->ParameterExists(GetFullParmName("GSM2_DomainRadius")) ) {
 				G4double parameter = fPm->GetUnitlessParameter(GetFullParmName("GSM2_DomainRadius"));
 				aSurvRBEQf->SetGSM2_rd(parameter);
+				GSM2DomainRadius = parameter;
 			}
 			G4double GSM2NucleusRadius = 0.;
 			if ( fPm->ParameterExists(GetFullParmName("GSM2_NucleusRadius")) ) {
@@ -818,7 +842,7 @@ void TsYScorer::GetRBE()
 				aSurvRBEQf->SetGSM2_betaX(parameter);
 			}
 			if(fSaveSpecificEnergySpectra==true)
-				OutputResultSpecificEnergy(GSM2NucleusRadius, doses);
+				OutputResultSpecificEnergy(GSM2NucleusRadius, GSM2DomainRadius, doses);
 
 
 			aSurvRBEQf -> GetSurvWithGSM2();
@@ -827,7 +851,7 @@ void TsYScorer::GetRBE()
 	}
 }
 
-void TsYScorer::OutputResultSpecificEnergy(G4double NucleusRadius, std::vector<double> MacroscopicDoses)
+void TsYScorer::OutputResultSpecificEnergy(G4double NucleusRadius, G4double DomainRadius, std::vector<double> MacroscopicDoses)
 {
 	//Create temp matrix defined as vector x vector instead of vector x double*
 	std::vector<std::vector<double>> tmp_yVector_Particle(yVector_Particle.size(), std::vector<double>(10,0.)); //DEBUG 
@@ -840,28 +864,30 @@ void TsYScorer::OutputResultSpecificEnergy(G4double NucleusRadius, std::vector<d
 	}
 
 
-
-	TsSpecificEnergy* aSpecificEnergy = new TsSpecificEnergy(tmp_yVector_Particle, NucleusRadius, fGetStatisticInfo, fSpectrumUpdateTimes);
-	std::vector<double> zBinCenter = aSpecificEnergy -> GetBinCenter();
-	std::vector<double> zBinWidth = aSpecificEnergy -> GetBinWidth();
-	double zF = aSpecificEnergy -> GetzF();
-	double zF_std = aSpecificEnergy -> GetzF_std();
-	std::vector<std::vector<double>> zParticleContribution = aSpecificEnergy -> GetParticleContribution();
-	std::vector<double> hfz = aSpecificEnergy -> GetHfz();
-	std::vector<double> hfz_std = aSpecificEnergy -> GetHfz_std();
-	std::vector<double> hzfz = aSpecificEnergy -> GetHzfz();
-	std::vector<double> hzfz_std = aSpecificEnergy -> GetHzfz_std();
+	//DOMAIN OUTPUT
+	TsSpecificEnergy* aSpecificEnergy_D = new TsSpecificEnergy(tmp_yVector_Particle, NucleusRadius, fGetStatisticInfo, fSpectrumUpdateTimes);
+	std::vector<double> zBinCenter = aSpecificEnergy_D -> GetBinCenter();
+	std::vector<double> zBinWidth = aSpecificEnergy_D -> GetBinWidth();
+	double zF = aSpecificEnergy_D -> GetzF();
+	double zF_std = aSpecificEnergy_D -> GetzF_std();
+	std::vector<std::vector<double>> zParticleContribution = aSpecificEnergy_D -> GetParticleContribution();
+	std::vector<double> hfz = aSpecificEnergy_D -> GetHfz();
+	std::vector<double> hfz_std = aSpecificEnergy_D -> GetHfz_std();
+	std::vector<double> hzfz = aSpecificEnergy_D -> GetHzfz();
+	std::vector<double> hzfz_std = aSpecificEnergy_D -> GetHzfz_std();
 	std::vector<std::vector<double>> hfzMultievent, hfzMultievent_std;
-	for(double D:MacroscopicDoses)
+	for(double D:zBinCenter)
 	{
-		hfzMultievent.push_back(aSpecificEnergy->GetHfzMultiEvent(D, fSetMultiEventStatistic));
-		hfzMultievent_std.push_back(aSpecificEnergy->GetHfzMultievent_var());
+		hfzMultievent.push_back(aSpecificEnergy_D->GetHfzMultiEvent(D, fSetMultiEventStatistic));
+		hfzMultievent_std.push_back(aSpecificEnergy_D->GetHfzMultievent_var());
 	}
 	//******************************************************************
 	//                          OutputResult
 	//******************************************************************
+	//SingleEvent
 	FILE* zSpecfile;
-	zSpecfile=fopen("zSpecfile.txt","w");
+	std::string fname = "zSpecfile_R_" + std::to_string(DomainRadius) + "_um.txt";
+	zSpecfile=fopen(fname.c_str(),"w");
 
 	G4cout <<"\n***************************** SPECIFIC ENERGY **********************\n"; 
 	G4cout << "zF = " << zF <<" ( std: "<< zF_std <<")"<< " keV/um" << G4endl;
@@ -882,8 +908,10 @@ void TsYScorer::OutputResultSpecificEnergy(G4double NucleusRadius, std::vector<d
 	}
 	fclose(zSpecfile);
 
+	//MuktiEvent 
 	FILE* zSpecfileMultievent;
-	zSpecfileMultievent=fopen("zSpecfileMultievent.txt","w");
+	fname = "zSpecfileMultiEvent_R_" + std::to_string(DomainRadius) + "_um.txt";
+	zSpecfileMultievent=fopen(fname.c_str(),"w");
 	//HEADER FILE
 	fprintf(zSpecfileMultievent,"zn [keV/um]");
 	for(double D:MacroscopicDoses) 
@@ -910,7 +938,102 @@ void TsYScorer::OutputResultSpecificEnergy(G4double NucleusRadius, std::vector<d
 	if(fGetSecondariesContribution)
 	{
 		FILE* zSpec_particle;
-		zSpec_particle=fopen("zSpecfile_Particle.txt","w"); 
+		fname = "zSpecfile_R_" + std::to_string(DomainRadius) + "_um_Particle.txt";
+		zSpec_particle=fopen(fname.c_str(),"w"); 
+		fprintf(zSpec_particle,"z(Gy)    e-           Zprim            Hsec            He           Li           Be           B            C            Other        Total[zn,1f(zn,1)]\n");
+
+		for (G4int i=0;i<zBinCenter.size();i++)
+		{       
+			fprintf(zSpec_particle,"%.4e ",zBinCenter[i]);
+			fprintf(zSpec_particle,"  ");
+
+			for(G4int loop=0; loop<10; loop++){
+				fprintf(zSpec_particle,"%.4e ",hfz[i]*zParticleContribution[i][loop]);
+				fprintf(zSpec_particle,"  ");
+			}
+
+			fprintf(zSpec_particle,"\n");
+
+		}
+		fclose(zSpec_particle);
+	}
+
+	//NUCLEUS OUTPUT
+	zParticleContribution.clear();
+	hfz.clear();
+	hfz_std.clear();
+	hzfz.clear();
+	hzfz_std.clear();
+	TsSpecificEnergy* aSpecificEnergy = new TsSpecificEnergy(tmp_yVector_Particle, NucleusRadius, fGetStatisticInfo, fSpectrumUpdateTimes);
+	zF = aSpecificEnergy -> GetzF();
+	zF_std = aSpecificEnergy -> GetzF_std();
+	zParticleContribution = aSpecificEnergy -> GetParticleContribution();
+	hfz = aSpecificEnergy -> GetHfz();
+	hfz_std = aSpecificEnergy -> GetHfz_std();
+	hzfz = aSpecificEnergy -> GetHzfz();
+	hzfz_std = aSpecificEnergy -> GetHzfz_std();
+	for(double D:MacroscopicDoses)
+	{
+		hfzMultievent.push_back(aSpecificEnergy->GetHfzMultiEvent(D, fSetMultiEventStatistic));
+		hfzMultievent_std.push_back(aSpecificEnergy->GetHfzMultievent_var());
+	}
+	//******************************************************************
+	//                          OutputResult
+	//******************************************************************
+	//SingleEvent
+	fname = "zSpecfile_R_" + std::to_string(NucleusRadius) + "_um.txt";
+	zSpecfile=fopen(fname.c_str(),"w");
+
+	G4cout <<"\n***************************** SPECIFIC ENERGY **********************\n"; 
+	G4cout << "zF = " << zF <<" ( std: "<< zF_std <<")"<< " keV/um" << G4endl;
+	G4cout <<"**********************************************************************\n";
+
+	fprintf(zSpecfile,"zF = %.4e (std: %.4e) keV/um\n",zF, zF_std);
+	fprintf(zSpecfile,"zn (keV/um)     fn,1(zn)(std)                  znfn,1(zn)(std)          \n");
+	for (G4int i=0;i<zBinCenter.size();i++)
+	{       
+		fprintf(zSpecfile,"%.4e ",zBinCenter[i]);
+		fprintf(zSpecfile,"    ");
+		fprintf(zSpecfile,"%.4e  %.4e ",hfz[i], hfz_std[i]);
+		fprintf(zSpecfile,"    ");
+		fprintf(zSpecfile,"%.4e  %.4e ",hzfz[i], hzfz_std[i]);
+		fprintf(zSpecfile,"    ");
+		fprintf(zSpecfile,"\n");
+
+	}
+	fclose(zSpecfile);
+
+	//MuktiEvent 
+	fname = "zSpecfileMultiEvent_R_" + std::to_string(NucleusRadius) + "_um.txt";
+	zSpecfileMultievent=fopen(fname.c_str(),"w");
+	//HEADER FILE
+	fprintf(zSpecfileMultievent,"zn [keV/um]");
+	for(double D:MacroscopicDoses) 
+		fprintf(zSpecfileMultievent,"      fn,n(zn,%.1f)(std)", D);
+	fprintf(zSpecfileMultievent, "\n");
+	//BODY FILE
+	for (G4int i=0;i<zBinCenter.size();i++)
+	{       
+		fprintf(zSpecfileMultievent,"%.4e ",zBinCenter[i]);
+		fprintf(zSpecfileMultievent,"    ");
+		for(int d=0; d<MacroscopicDoses.size(); d++)
+		{
+			fprintf(zSpecfileMultievent,"%.4e  %.4e ", hfzMultievent[d][i], hfzMultievent_std[d][i]);
+			fprintf(zSpecfileMultievent,"    ");
+		}
+		fprintf(zSpecfileMultievent,"\n");
+
+	}
+	fclose(zSpecfileMultievent);
+
+	//******************************************************************
+	//                          Output particle contribution
+	//******************************************************************
+	if(fGetSecondariesContribution)
+	{
+		FILE* zSpec_particle;
+		fname = "zSpecfile_R_" + std::to_string(NucleusRadius) + "_um_Particle.txt";
+		zSpec_particle=fopen(fname.c_str(),"w"); 
 		fprintf(zSpec_particle,"z(Gy)    e-           Zprim            Hsec            He           Li           Be           B            C            Other        Total[zn,1f(zn,1)]\n");
 
 		for (G4int i=0;i<zBinCenter.size();i++)
