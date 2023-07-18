@@ -1,20 +1,46 @@
-TOPAS MC Microdosimetric extension
-========
+# MONAS: MicrOdosimetry-based modeling for RBE Assessment
 
-### Reference paper:
-G.Cartechini et al. Under Submission.
+ ## Introduction
+ MONAS expands TOPAS microdosimetric extension, by including novel specific energy scorers to calculate the single- and multi-event specific energy microdosimetric distributions at different micrometer scales. These spectra are used as physical input to three different formulations of the **Microdosimetric Kinetic Model (MKM)**, and to the **Generalized Stochastic Microdosimetric Model (GSM2)**, to predict dose-dependent cell survival fraction and RBE.
 
-#### Extension Parameters
+# Files
 
- - `b:Sc/.../GetRBEWithMKModel = "True"` Get RBE and Survival with one or more MKM formulations 
- - `sv:Sc/.../GetRBEWithMKModel = 4 "SaturationCorrection" "nonPoisson" ...`
-      1. **SaturationCorrection**,  
-      2. "meanValues" Then a file will be created, named "PROJECTNAME_survival_MKM.csv", containing the information about the parameters chosen for the simulation and the values of doses delivered and survival observed (a new line for each energy or dose evaluated).
-   
-      3. "cellValues" This kind of output is supported only by the MonteCarlo calculusType. It is a way to store the values of dose and survival obtained for each single cell irradiated during the monte carlo simulation. Then a directory will be created, named "PROJECTNAME_survival_data". In the directory the user will find a description file named "000_MonteCarlo_parameters.csv", listing the parameters used in the simulation, and a directory with the same name containing the corresponding data. In particular in the subdirectory some file will be created (a file for each level of dose imposed), each one containing two column with the dose delivered and the survival observed for each cell irradiated. When a new simulation is lauched with the same project name, the program will do a check over all the description files in the directory, if the parameters of the simulation are the same of another one already done, then it will enter the related subdirectory and append data there, if not a new description file (with progressive number) and corresponding subdirectory will be created.
-      
-   **Note**: the cell line is only determined by the chosen model parameters. `-cellType` is only a tag to indicate the cell, useful for bookkeeping.
+ - **TsYScorer**: It is the main file of the extension. This file mages the input parameters, the energy spectra, Survival and RBE calculation, and the output files. This file was already present in the original microdosimetric extension and it improved to include the MONAS calculations.
+ - **TsGetSurvivalRBEQualityFactor**: Class that manages the cell survival and RBE calculation from 3 MKM formulations (MKM-z*, mSMKM, DSMKM) and GSM2.
+ - **TsGSM2parallel**: Class used to manage the GSM2 cell survival fraction calculation.
+ - **TsSpecificEnergy**: In this file it is defined the class for the storage of specific energy distributions: single- and multi-event.
+ - **TsLinealEnergy**: Similar to TsSpecificEnergy, but for y-distributions.
+ - **TsSOIMicrodosimeter**: In this file is defined the SOI detector geometry. 
+ - **TsTrackerHit**:
 
-### Bibliography
+## Input parameters
+### Model independent parameters
 
+### MKM models
+
+ - `GetRBEWithMKModel`: boolean flag to activate MKM models
+ `b:Sc/Scorer/GetRBEWithMKModel = "True" #True or False`
+
+ - `MKMCalculation`: string vector with MKM formulations. Options: "SaturationCorrection", "nonPoisson", "DSMKM". **NOTE: when more formulations are selected, they share the same model parameters.**
+ `sv:Sc/Scorer/MKMCalculation = 1 "SaturationCorrection"`
+ 
+ - `MKModel_DomainRadius`: Cell domain radius [**um**]
+ `u:Sc/Scorer/MKModel_DomainRadius = 0.44`
+ 
+ - `MKModel_NucleusRadius`: Cell nucleus radius [**um**]
+ `u:Sc/Scorer/MKModel_NucleusRadius = 3.9`
+ 
+ - `u:Sc/Scorer/MKModel_alpha0 = 0.19`
+ - `u:Sc/Scorer/MKModel_beta0 = 0.07`
+ - `u:Sc/Scorer/MKModel_y0 = 150`
+ 
+### GSM2 model parameters
+ - `b:Sc/Scorer/GetRBEWithGSM2 = "True"`
+ - `u:Sc/Scorer/GSM2_DomainRadius = 0.44`
+ - `u:Sc/Scorer/GSM2_NucleusRadius = 3.9`
+ - `u:Sc/Scorer/GSM2_a = 0.19`
+ - `u:Sc/Scorer/GSM2_b = 0.07`
+ - `u:Sc/Scorer/GSM2_r = 150`
+
+## Output files
 
