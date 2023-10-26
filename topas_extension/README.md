@@ -17,11 +17,15 @@
 Just follow the topas README.txt file.
 ```
 cd <path_to_topas>/
+```
+```
 cmake -DTOPAS_EXTENSIONS_DIR=<path_to_topas_extensions>/MONAS/topas_extension
+```
+```
 make -j
 ```
-==NOTE:== You cannot compile the standard microdosimetric extension and monas extension together. They share same classes and the compile will give you an error.
-==MONAS has the same features as the standare microdosimetric extensions. You can directly compile MONAS to have the same output==
+**NOTE:** You cannot compile the standard microdosimetric extension and monas extension together. They share same classes and the compile will give you an error.\
+**MONAS has the same features as the standare microdosimetric extensions. You can directly compile MONAS to have the same output**
 
 ## Input parameters
 ### Model independent parameters
