@@ -3,7 +3,7 @@
  ## Introduction
  MONAS expands TOPAS microdosimetric extension, by including novel specific energy scorers to calculate the single- and multi-event specific energy microdosimetric distributions at different micrometer scales. These spectra are used as physical input to three different formulations of the **Microdosimetric Kinetic Model (MKM)**, and to the **Generalized Stochastic Microdosimetric Model (GSM2)**, to predict dose-dependent cell survival fraction and RBE.
 
-# Files
+## Files
 
  - **TsYScorer**: It is the main file of the extension. This file mages the input parameters, the energy spectra, Survival and RBE calculation, and the output files. This file was already present in the original microdosimetric extension and it improved to include the MONAS calculations.
  - **TsGetSurvivalRBEQualityFactor**: Class that manages the cell survival and RBE calculation from 3 MKM formulations (MKM-z*, mSMKM, DSMKM) and GSM2.
@@ -12,6 +12,16 @@
  - **TsLinealEnergy**: Similar to TsSpecificEnergy, but for y-distributions.
  - **TsSOIMicrodosimeter**: In this file is defined the SOI detector geometry. 
  - **TsTrackerHit**:
+
+## Compile
+Just follow the topas README.txt file.
+```
+cd <path_to_topas>/
+cmake -DTOPAS_EXTENSIONS_DIR=<path_to_topas_extensions>/MONAS/topas_extension
+make -j
+```
+==NOTE:== You cannot compile the standard microdosimetric extension and monas extension together. They share same classes and the compile will give you an error.
+==MONAS has the same features as the standare microdosimetric extensions. You can directly compile MONAS to have the same output==
 
 ## Input parameters
 ### Model independent parameters
