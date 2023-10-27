@@ -13,11 +13,12 @@ It takes as input the PhaseSpace produced by TOPAS microdosimetric extension whi
 
 ## COMPILE
 ```
-make all
+cmake .
+make -j
 ```
 ## RUN
 ```
-./monas -parameters...
+./bin/monas -parameters...
 ```
 Example MKM:
 ```
