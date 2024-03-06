@@ -4,8 +4,10 @@
  MONAS expands TOPAS microdosimetric extension, by including novel specific energy scorers to calculate the single- and multi-event specific energy microdosimetric distributions at different micrometer scales. These spectra are used as physical input to three different formulations of the **Microdosimetric Kinetic Model (MKM)**, and to the **Generalized Stochastic Microdosimetric Model (GSM2)**, to predict dose-dependent cell survival fraction and RBE.
 
 ## Reference
-- `Cartechini, Giorgio, et al. "Integrating microdosimetric in vitro RBE models for particle therapy into TOPAS MC using the MicrOdosimetry-based modeliNg for RBE ASsessment (MONAS) tool." Physics in Medicine & Biology 69.4 (2024): 045005.`
-- `
+- Cartechini, Giorgio, et al. "Integrating microdosimetric in vitro RBE models for particle therapy into TOPAS MC using the MicrOdosimetry-based modeliNg for RBE ASsessment (MONAS) tool." Physics in Medicine & Biology 69.4 (2024): 045005.
+
+-BibTeX:
+``` 
 @article{cartechini2024integrating,
   title={Integrating microdosimetric in vitro RBE models for particle therapy into TOPAS MC using the MicrOdosimetry-based modeliNg for RBE ASsessment (MONAS) tool},
   author={Cartechini, Giorgio and Missiaggia, Marta and Scifoni, Emanuele and La Tessa, Chiara and Cordoni, Francesco G},
@@ -16,7 +18,7 @@
   year={2024},
   publisher={IOP Publishing}
 }
-`
+```
 
 # Files
 
