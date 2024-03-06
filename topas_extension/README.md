@@ -5,7 +5,8 @@
 
 ## Reference
 - ```Cartechini, Giorgio, et al. "Integrating microdosimetric in vitro RBE models for particle therapy into TOPAS MC using the MicrOdosimetry-based modeliNg for RBE ASsessment (MONAS) tool." Physics in Medicine & Biology 69.4 (2024): 045005.```
-- ```@article{cartechini2024integrating,
+- ```
+@article{cartechini2024integrating,
   title={Integrating microdosimetric in vitro RBE models for particle therapy into TOPAS MC using the MicrOdosimetry-based modeliNg for RBE ASsessment (MONAS) tool},
   author={Cartechini, Giorgio and Missiaggia, Marta and Scifoni, Emanuele and La Tessa, Chiara and Cordoni, Francesco G},
   journal={Physics in Medicine \& Biology},
@@ -14,7 +15,8 @@
   pages={045005},
   year={2024},
   publisher={IOP Publishing}
-}```
+}
+```
 
 # Files
 
