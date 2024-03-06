@@ -60,7 +60,8 @@
 ## Scorer Example Parameters
 Example of MONAS Scorer using a spherical TEPC detector.
 
-`s:Sc/Scorer/Quantity    = "TsYScorer"
+```
+s:Sc/Scorer/Quantity    = "TsYScorer"
 s:Sc/Scorer/Component   = "TEgasSV"
 #
 # Mandatory parameters
@@ -108,6 +109,7 @@ u:Sc/Scorer/GSM2_r = 3.641
 u:Sc/Scorer/GSM2_alphaX = 0.19 #HSG 200 kV
 u:Sc/Scorer/GSM2_betaX = 0.05 #HSG 200 kV
 
-uv:Sc/Scorer/SurvivalDoses = 3 1 10 2`
+uv:Sc/Scorer/SurvivalDoses = 3 1 10 2
+```
 
 
