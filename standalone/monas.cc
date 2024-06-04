@@ -179,8 +179,9 @@ int main(int argc, char *argv[])
 			>> y_z6
 			>> y_z_;
 
-		//vector<double> yParticle {y_z0, y_z1_prim, 0, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
-		vector<double> yParticle {y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+		vector<double> yParticle {y_z0, y_z1_prim, 0, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+		
+		//vector<double> yParticle {y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
 		yVector_Particle.push_back(yParticle);
 		yVector.push_back(y_total);  
 	}
@@ -212,7 +213,7 @@ int main(int argc, char *argv[])
 	vector<vector<double>> contribution = aLinealEnergy -> GetParticleContribution();
 	hydy = aLinealEnergy->Getydy();
 
-	TsGetSurvivalRBEQualityFactor *aSurvRBEQf = new TsGetSurvivalRBEQualityFactor(contribution,yVector_Particle, &BinLimit[0], &BinWidth[0], &hfy[0], &hdy[0], yF, yD, yF_var, yD_var, fy_var, dy_var, yBinNum, fGetStatitisticInfo, fSpectrumUpdateTimes, fGetParticleContribution);
+	TsGetSurvivalRBEQualityFactor *aSurvRBEQf = new TsGetSurvivalRBEQualityFactor(contribution, yVector, yVector_Particle, &BinLimit[0], &BinWidth[0], &hfy[0], &hdy[0], yF, yD, yF_var, yD_var, fy_var, dy_var, yBinNum, fGetStatitisticInfo, fSpectrumUpdateTimes, fGetParticleContribution);
 	
 	aSurvRBEQf->SetDosesMacro(&Doses[0]);
 	aSurvRBEQf -> SetMCMultieventIterations(fSetMultiEventStatistic);

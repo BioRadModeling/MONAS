@@ -32,7 +32,7 @@
 #include <random>
 #include <thread>
 #include <chrono>
-#include<vector>
+#include <vector>
 
 using namespace std;
 
@@ -132,8 +132,8 @@ void TsLinealEnergy::InitializeStatistic()
 
 void TsLinealEnergy::GetSpectrum()
 {
-	cout<<"yVector size="<<fyVector.size()<< endl;
-	cout<<"yVector_Particle size" << fyVector_Particle.size();
+	cout<<"yVector size = "<<fyVector.size()<< endl;
+	cout<<"yVector_Particle size = " << fyVector_Particle.size()<< endl;
 	int nnum=0;
 	int index=0;
 	for (std::vector<double>::const_iterator i = fyVector.begin(); i != fyVector.end(); ++i){

@@ -34,7 +34,7 @@ using namespace std;
 class TsGetSurvivalRBEQualityFactor 
 {
 	public:
-		TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<std::vector<double>> yVector_Partcile, double*BinLimit, double* hBinWidth, double* hfy, double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double>hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimesi, bool GetParticleContribution);
+		TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, double*BinLimit, double* hBinWidth, double* hfy, double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double>hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimesi, bool GetParticleContribution);
 		~TsGetSurvivalRBEQualityFactor();
 
 		void GetSurvWithMKModel_SaturationCorr();
@@ -93,6 +93,7 @@ class TsGetSurvivalRBEQualityFactor
 		int  fSpectrumUpdateTimes;
 		bool fGetParticleContribution;
 		int MCMultieventIterations;
+		std::vector<double> fyVector;
 		std::vector<std::vector<double>> fyVector_Particle;
                 std::vector<std::vector<double>> fyParticleContribution;
 		double* fBinLimit;

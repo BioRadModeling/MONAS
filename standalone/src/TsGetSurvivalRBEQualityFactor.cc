@@ -32,7 +32,7 @@
 
 using namespace std;
 
-TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<std::vector<double>> yVector_Particle, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
+TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
 	:fyParticleContribution(yParticleContribution), fyVector_Particle(yVector_Particle),fBinLimit(hBinLimit), fBinWidth(hBinWidth), fhfy(hfy), fhdy(hdy), yF(hyF), yD(hyD), yF_var(hyF_var), yD_var(hyD_var), fy_var(hfy_var), dy_var(hdy_var),fSpecLength(SpecLength), fGetStatitisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetParticleContribution(GetParticleContribution)
 {
 	// default values of MK model
@@ -66,7 +66,7 @@ TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::ve
 	GSM2_alphaX 	= 0.19;
 	GSM2_betaX 	= 0.05;
 	//Macroscopic Doses
-	Doses = {0, 1,2,3,4,5,6,7,8,9,10}; //Unit:Gy
+	Doses = {0,1,2,3,4,5,6,7,8,9,10}; //Unit:Gy
 
 	//MultiEventIterations
 	MCMultieventIterations = 1e4;
@@ -322,7 +322,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SplitDoseIrradiation()
 
 	cout<<"Default parameters:"<<endl;
 	cout<<"1.The reference radiation is X-ray(200 kVp) with alpha = 0.19 Gy-1 and beta = 0.05 Gy-2"<<std::endl;
-	cout<<"2.THe bilogical end point is 10% survival of he human salivary gland (HSG) tumor cells."<<std::endl;
+	cout<<"2.THe biological end point is 10% survival of he human salivary gland (HSG) tumor cells."<<std::endl;
 	cout<<"Parameter used in this calculation:"     <<std::endl;
 	cout<<"alpha0="<<MKModel_alpha0<<" Gy-1; "<<"beta="<<MKModel_beta<<" Gy-2; "
 		<<"rd="<<MKModel_rd<<" um; "<< "Rn="<< MKModel_Rn <<" um; "<<"y0="<<MKModel_y0<<" keV/um; "
@@ -772,7 +772,7 @@ void TsGetSurvivalRBEQualityFactor::GetQualityFactorWithKellereHahn()
 		cout << "MERDA1"<< endl;
 		WriteQParticleContribution("QKellerer_Particle.csv", QComponents);
 	}
-	std::cout<<"******************** Get Quality Factor with Kellerer-Hahn approximation **************************"<<std::endl;
+	std::cout<<"****************kappa**** Get Quality Factor with Kellerer-Hahn approximation **************************"<<std::endl;
 	std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<"Q = "<<Q;
 	std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< Q_std<<")"<<std::endl;
 	std::cout<<"***************************************************************************************\n"<<std::endl;
@@ -783,7 +783,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 
 	double alphaX = GSM2_alphaX;
 	double betaX = GSM2_betaX;
-	TsGSM2* aGSM2 = new TsGSM2(yF,  GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, fyVector_Particle, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	TsGSM2* aGSM2 = new TsGSM2(yF,  GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, fyVector, fyVector_Particle, fGetStatitisticInfo, fSpectrumUpdateTimes);
 	cout << MCMultieventIterations << endl;
 	vector<double> zBinCenter = aGSM2->GetZn();
 	vector<double> zBinWidth = aGSM2->GetzBinWidth();

@@ -38,17 +38,17 @@
 //#include "g4root.hh"
 
 
-
 using namespace std;
 
 //CONTROLLARE GLI HISO (BIN START, BIN END)
 class TsGSM2 
 {
 	public:
-		TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<std::vector<double>> yVector_Particle, bool GetStatisticInfo, int SpectrumUpdateTimes);
+		TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, bool GetStatisticInfo, int SpectrumUpdateTimes);
 		~TsGSM2();
 
 		//input solo parametri biologici
+		double CalculateKappaFromSpectra(); // New Kappa formulation
 		void InitializeHistograms(int bins, double start, double end);
 		void SetSpecificEnergySpectraCellNucleus();
 		void ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vector<double> &p0xy, double zn, int NumberOfSamples);
@@ -70,6 +70,8 @@ class TsGSM2
 
 		vector<double> GetZn() {return zBinCenter;};
 		vector<double> GetzBinWidth() {return zBinWidth;};
+		
+		
 	private:
 		//Histograms settings
 		int fzBins; 
@@ -83,6 +85,7 @@ class TsGSM2
 		std::vector<double> fCountMap_p0x, fFirstMomentMap_p0x, fSecondMomentMap_p0x, fVariance_p0x, fStandardDeviation_p0x;
 		std::vector<double> fCountMap_p0y, fFirstMomentMap_p0y, fSecondMomentMap_p0y, fVariance_p0y, fStandardDeviation_p0y;
 		//y events per particle matrix
+		std::vector<double> fyVector;
 		std::vector<std::vector<double>> fyVector_Particle;
 
 		//microdosimetric z on cell domain
@@ -108,6 +111,14 @@ class TsGSM2
 		bool fGetStatisticInfo;
 		int fSpectrumUpdateTimes;
 		TsSpecificEnergy *fSpecificEnergy_D, *fSpecificEnergy_C;
+		
+		// Variable for Kappa from spectra calculation
+		const int yBinNum = 100; // yBinNum == yBinMagnitude*yBinMagnitudeInterval
+		const double yBinMagnitudeInterval = 20.;
+		const double yBinMagnitude = 5.;
+		std::vector<std::vector<double>> yParticleContibution;
+		double **hfy_particle, sum_BinWidth, sum_TotalContributionParticle, KappaValue;
+		std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth, yF, KappaParticle, TotalContributionParticle;
 };
 
 

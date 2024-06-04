@@ -33,6 +33,8 @@
 #include <random>
 #include <thread>
 #include <algorithm>
+#include <numeric> // Addition to sum a vector
+
 
 //#include "globals.hh"
 //#include "G4RandomDirection.hh"
@@ -42,13 +44,16 @@
 
 using namespace std;
 
-TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<std::vector<double>> yVector_Particle, bool GetStatisticInfo, int SpectrumUpdateTimes)
-	:GSM2Model_yF(yF), GSM2Model_rd(Rd), GSM2Model_rc(Rc), GSM2_a(kinA), GSM2_b(kinB), GSM2_r(kinR), fyVector_Particle(yVector_Particle), fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes)
+TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, bool GetStatisticInfo, int SpectrumUpdateTimes)
+	:GSM2Model_yF(yF), GSM2Model_rd(Rd), GSM2Model_rc(Rc), GSM2_a(kinA), GSM2_b(kinB), GSM2_r(kinR), fyVector(yVector), fyVector_Particle(yVector_Particle), fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes)
 {
-
-
-	//Kappa and lambda
-	double nDBS = 139.6*exp(0.0002568*GSM2Model_yF) -92.28*exp(-0.01855*GSM2Model_yF);
+	// Old Kappa and lambda
+	//double nDBS = 139.6*exp(0.0002568*GSM2Model_yF) -92.28*exp(-0.01855*GSM2Model_yF);
+	
+	// New Kappa formulation
+	
+	double nDBS = CalculateKappaFromSpectra();
+	
 	GSM2Model_kappa = nDBS*pow(GSM2Model_rd/GSM2Model_rc,3);
 	GSM2Model_lambda = GSM2Model_kappa*1e-3;
 
@@ -82,6 +87,112 @@ TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double
 
 TsGSM2::~TsGSM2()
 {};
+
+// New method for Kappa
+double TsGSM2::CalculateKappaFromSpectra()
+{
+	// New formulation of Kappa and Lambda from PARTRAC simulations on DSBsites (Kundrát, Baiocco et al.)	
+	// "Total DSBsites yield" parameters (H,H_sec,He,Li,Be,B,C) e- and other missing (first and ninth column)
+	
+	vector<double> p1{6.8,6.8,6.8,6.8,6.8,6.8,6.8};  	                  
+	vector<double> p2{0.1773,0.1773,0.1471,0.1653,0.1425,0.1587,0.156};
+	vector<double> p3{0.9314,0.9314,1.038,0.8782,0.95,0.8714,0.9214};
+	vector<double> p4{0,0,0.006239,0.004284,0.005151,0.004345,0.005245};
+	vector<double> p5{0,0,1.582,1.406,1.407,1.389,1.395};
+	std::cout<<"DEBUG 3\n";
+	// Calculation of particle contribution to y
+	hfy.resize(yBinNum);
+	hdy.resize(yBinNum);
+	hyfy.resize(yBinNum);
+	hydy.resize(yBinNum);
+	hfy_particle = new double *[yBinNum];
+	for (int i=0; i<yBinNum; i++)
+		hfy_particle[i] =new double [10];	
+
+	BinLimit.resize(yBinNum+1);
+	BinWidth.resize(yBinNum);
+
+	BinLimit[0]=0.1;
+	for (int i=0;i<yBinNum;i++)
+	{
+		double aa = (double)((i+1)/yBinMagnitudeInterval);
+		BinLimit[i+1] = pow(10,(aa -1.0));
+		BinWidth[i] = BinLimit[i+1]-BinLimit[i];
+	}
+	
+	
+	int nnum=0;
+	int index=0;
+	for (std::vector<double>::const_iterator i = fyVector.begin(); i != fyVector.end(); ++i){
+		for (int n=0;n<yBinNum;n++){
+			if(*i<=BinLimit[n+1]){
+				hfy[n] = hfy[n]+1;
+				for(int particle = 0; particle<10; particle++)
+				{
+					hfy_particle[n][particle] += fyVector_Particle[index][particle];
+				}
+				break;
+			}
+		}
+		nnum=nnum+1;
+		index++;
+	}
+	std::cout<<"DEBUG 4\n";
+	for (int i=0;i<yBinNum;i++)
+		{
+		hfy[i] = hfy[i]/(BinWidth[i]*nnum); 	              // normalization. divide by bin width * number of entries
+		hyfy[i] = (BinLimit[i]+BinLimit[i+1])/2*hfy[i];        // calculate y*f(y) = BinCenter * BinContent
+		
+		//Calculate particle contibution
+		std::vector<double> contribution;
+		for(int particle = 0; particle<10; particle++)
+		{
+			if(hfy_particle[i][9] == 0) 
+				contribution.push_back(0.);
+			else
+				contribution.push_back(hfy_particle[i][particle]/hfy_particle[i][9]);
+			
+		}
+		yParticleContibution.push_back(contribution);
+	}
+	
+	std::cout<<"DEBUG 5\n";
+	// Calculate yF for each particle (multiply by bin width)
+	for (int particle = 0; particle<9; particle++)
+	{std::cout<<"DEBUG 6\n";
+		for (int i=0;i<yBinNum;i++){
+			yF[particle] += hyfy[i]*BinWidth[i]*yParticleContibution[i][particle]; 
+		}      
+	}
+	
+	// Evaluate total contribution (std::accumulate)
+	sum_BinWidth = accumulate(BinWidth.begin(), BinWidth.end(), 0);
+	for (int particle = 0; particle<9; particle++){
+		TotalContributionParticle[particle] = 0;
+		for (int i=0;i<yBinNum;i++){
+			TotalContributionParticle[particle] = TotalContributionParticle[particle] + BinWidth[i]*yParticleContibution[i][particle];    
+		} 
+		TotalContributionParticle[particle] = TotalContributionParticle[particle]/sum_BinWidth;     
+	}
+	
+	// Calculate Kappa for each particle
+	for (int particle = 0; particle<9; particle++){
+		if (particle == 0)
+			KappaParticle[particle] = 9*(p1[particle]+pow((p2[particle]*yF[particle]),p3[particle]))/(1+pow((p4[particle]*yF[particle]),p5[particle]));
+		else if (particle == 8)
+			KappaParticle[particle] = 9*(p1[particle-2]+pow((p2[particle-2]*yF[particle]),p3[particle-2]))/(1+pow((p4[particle-2]*yF[particle]),p5[particle-2]));
+		else
+			KappaParticle[particle] = 9*(p1[particle-1]+pow((p2[particle-1]*yF[particle]),p3[particle-1]))/(1+pow((p4[particle-1]*yF[particle]),p5[particle-1]));
+	}
+	
+	// Return Kappa weighted with particle contributions
+	sum_TotalContributionParticle = accumulate(TotalContributionParticle.begin(), TotalContributionParticle.end(), 0);
+	KappaValue = 0;
+	for(int particle = 0; particle<9; particle++){
+		KappaValue = KappaValue + KappaParticle[particle]*TotalContributionParticle[particle];
+	}
+	return KappaValue/sum_TotalContributionParticle;
+}
 
 void TsGSM2::ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vector<double> &p0y, double zn, int NumberOfSamples)
 {
