@@ -87,6 +87,7 @@ void TsLinealEnergy::InitializeMicrodosimetricSpectrum()
 
 	yF = 0.;
 	yD = 0.;
+	yF_Particle.resize(10);
 	hfy.resize(yBinNum);
 	hdy.resize(yBinNum);
 	hyfy.resize(yBinNum);
@@ -180,10 +181,19 @@ void TsLinealEnergy::GetSpectrum()
 //	cout << "sum of f(y)*delta_y ="<< Probability_fy<<endl;    
 
 	//calculate yF
+	for (int particle = 0; particle<10; particle++)
+	{	
+		for (int i=0;i<yBinNum;i++){
+			yF_Particle[particle] += hyfy[i]*BinWidth[i]*yParticleContibution[i][particle]; 
+		}   
+	}
+	std::cout<<yF_Particle[9]<<endl;  // DEBUGGING 
+	
 	yF=0;
 	for (int i=0;i<yBinNum;i++){
 		yF = yF + hyfy[i]*BinWidth[i];          // multiply by bin width
 	}
+	std::cout<<yF<<endl;  // DEBUGGING 
 
 	for (int i=0;i<yBinNum;i++){
 		hdy[i] = hyfy[i]/yF;                                    //calculate d(y) = y*f(y)/yF (cf. Burigo et al., NIMB 320 (2014))

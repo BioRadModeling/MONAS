@@ -31,6 +31,7 @@
 #include <iostream>
 
 #include "TsSpecificEnergy.hh"
+#include "TsLinealEnergy.hh"
 
 //#include "globals.hh"
 //#include "G4RandomDirection.hh"
@@ -116,9 +117,8 @@ class TsGSM2
 		const int yBinNum = 100; // yBinNum == yBinMagnitude*yBinMagnitudeInterval
 		const double yBinMagnitudeInterval = 20.;
 		const double yBinMagnitude = 5.;
-		std::vector<std::vector<double>> yParticleContibution;
-		double **hfy_particle, sum_BinWidth, sum_TotalContributionParticle, KappaValue;
-		std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth, yF, KappaParticle, TotalContributionParticle;
+		double **hfy_particle;
+		std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth;
 };
 
 
