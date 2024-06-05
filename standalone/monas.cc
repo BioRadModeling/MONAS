@@ -166,12 +166,12 @@ int main(int argc, char *argv[])
 	while(!infile.eof()) // reads file to end of *file*, not line
 	{ 
 
-		//double y_total, y_z0, y_z1_prim, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
-		double y_total, y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
+		double y_total, y_z0, y_z1_prim, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
+		//double y_total, y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
 		infile >> y_total 
 			>> y_z0
 			>> y_z1_prim
-			>> y_z1_seco
+			//>> y_z1_seco
 			>> y_z2
 			>> y_z3
 			>> y_z4
@@ -182,6 +182,7 @@ int main(int argc, char *argv[])
 		vector<double> yParticle {y_z0, y_z1_prim, 0, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
 		
 		//vector<double> yParticle {y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+		
 		yVector_Particle.push_back(yParticle);
 		yVector.push_back(y_total);  
 	}
