@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 			Doses = {stod(argv[i+1]), stod(argv[i+2]), stod(argv[i+3])};
 		}
 
-		if(strcmp(argv[i],"-topasScorer") == 0) {TopasScorerFile = argv[i+1];}
+		if(strcmp(argv[i],"-topasScorer") == 0) {TopasScorerFile = argv[i+1];} //input file
 		if(strcmp(argv[i],"-help") == 0) 
 		{
 			cout 	<<"-Rd: Domain radius [um]" <<endl

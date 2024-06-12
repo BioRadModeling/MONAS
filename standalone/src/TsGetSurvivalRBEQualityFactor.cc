@@ -826,7 +826,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		{
 			end = clock();
 			float duration = (float) (end - start)/ CLOCKS_PER_SEC;
-			std::cout << (update/tenPercent)*10<< " % of Radiobiological model update finished, total time used :"<<duration<<" sec; ("<<duration/60<<" min)"<<std::endl;
+			std::cout << (update/tenPercent)*10<< '%' << " of Radiobiological model update finished, total time used :"<<duration<<" sec; ("<<duration/60<<" min)"<<std::endl;
 
 		}	
 		update++;
@@ -893,7 +893,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		{
 			end = clock();
 			float duration = (float) (end - start)/ CLOCKS_PER_SEC;
-			std::cout << (update/tenPercent)*10<< " % of Radiobiological model update finished, total time used :"<<duration<<" sec; ("<<duration/60<<" min)"<<std::endl;
+			std::cout << (update/tenPercent)*10 << '%' << " of Radiobiological model update finished, total time used :"<<duration<<" sec; ("<<duration/60<<" min)"<<std::endl;
 
 		}	
 		update++;
