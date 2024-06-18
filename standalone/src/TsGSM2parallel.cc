@@ -96,71 +96,16 @@ TsGSM2::~TsGSM2()
 // New method for Kappa
 double TsGSM2::CalculateKappaFromSpectra()
 {	
-	// To be modified inspired by this R function, which needs access to the full scorer
-	/*
-	get_p0x_single_modified<-function(i,df=df,zn=zn,zF_s=zF_s,scorer=x_,Rn=Rn,rd=rd){
-		  number_of_damage <- 0
-		  nu <- rpois(1, zn/zF_s)
-		  if(nu == 0){
-		    return(0)
-		  }
-		  # Sample nu z depositions
-		  vector_z <- sample(df$z, size = nu, replace = TRUE, prob = df$zfz)
-		  # Conversion in y
-		  # vector_y <- vector_z*(4*rd*rd)/0.204
-		  # Get bin min e bin max for each z
-		  # Selection lines depositing inside bin from Scorer.phsp
-		  # Sampling one line
-		  # "Total DSBsites yield" parameters (e-,H,He,Li,Be,B,C) e- and other missing (first and ninth column)
-		  p1<-c(6.8,6.8,6.8,6.8,6.8,6.8,6.8,6.8)  	                  
-		  p2<-c(0.1773,0.1773,0.1471,0.1653,0.1425,0.1587,0.156,0.156)
-		  p3<-c(0.9314,0.9314,1.038,0.8782,0.95,0.8714,0.9214,0.9214)
-		  p4<-c(0,0,0.006239,0.004284,0.005151,0.004345,0.005245,0.005245)
-		  p5<-c(0.0001,0.0001,1.582,1.406,1.407,1.389,1.395,1.395) // first two values to avoid power of 0 at denominator
-		  for(ii in c(1:nu)){
-		    bin_min <- max(df$bin_min[df$bin_min < vector_z[ii]])
-		    bin_max <- min(df$bin_min[df$bin_min > vector_z[ii]])
-		    # Conversion in y
-		    batch_y <- filter(scorer, V1 > bin_min*(4*rd*rd)/0.204 & V1 < bin_max*(4*rd*rd)/0.204)
-		    # Sample one single line
-		    vector_y <- batch_y[sample(nrow(batch_y), 1), ] %>% as.numeric()
-		    # Evaluate Kappa with contribution (weights)
-		    weights <- vector_y[-1]/vector_y[1]
-		    # Compute kappa for each contribution (tot,e-,H,He,Li,Be,B,C,other)
-		    Kappa_value <- 9*(p1+(p2*vector_y[-1])^p3)/(1+(p4*vector_y[-1])^p5)
-		    # Compute total Kappa as LETd (phi_1 is weights[i] and LET is kappa for each particle)
-		    Kappa <- (sum(weights*Kappa_value^2))/(sum(weights*Kappa_value))
-		    Kappa <- Kappa/((Rn*Rn*Rn)/(rd*rd*rd))
-		    #print(Kappa)
-		    #number_of_damage <- number_of_damage+rpois(1, Kappa*vector_z[ii])
-		  }
-  		  number_of_damage <- rpois(1, mean(Kappa) * sum(vector_z))
-		  print ("End one sim")
-		  
-		  # vettore di kappa da cui campionare un vettore di poisson (usando z punto 1)
-		  # somma poisson
-		  #z_all <- sum(z_vector)
-		  
-		  #number_of_damage <- rpois(1, kappa*z_all)
-		  # 
-		  #rpois(1,kappa*sum(sample(df$z, size = rpois(1,zn/zF_s), replace = TRUE, prob = df$zfz)))
-		  
-		  return(number_of_damage)
-	}
-
-	*/
-	
-	
 	// New formulation of Kappa and Lambda from PARTRAC simulations on DSBsites (Kundrát, Baiocco et al.)	
-	// "Total DSBsites yield" parameters (H,H_sec,He,Li,Be,B,C) e- and other missing (first and ninth column)
+	// "Total DSBsites yield" parameters (e-,H,H_sec,He,Li,Be,B,C,others)
 	
 	TsLinealEnergy* ySpectra_F = new TsLinealEnergy(fyVector_Nucleus,fyVector_Particle_Nucleus); // yF scored in a nucleus-size volume
 	
-	vector<double> p1{6.8,6.8,6.8,6.8,6.8,6.8,6.8};  	                  
-	vector<double> p2{0.1773,0.1773,0.1471,0.1653,0.1425,0.1587,0.156};
-	vector<double> p3{0.9314,0.9314,1.038,0.8782,0.95,0.8714,0.9214};
-	vector<double> p4{0,0,0.006239,0.004284,0.005151,0.004345,0.005245};
-	vector<double> p5{0,0,1.582,1.406,1.407,1.389,1.395};
+	vector<double> p1{6.8,6.8,6.8,6.8,6.8,6.8,6.8,6.8,6.8}; 	                  
+	vector<double> p2{0.1773,0.1773,0.1773,0.1471,0.1653,0.1425,0.1587,0.156,0.156};
+	vector<double> p3{0.9314,0.9314,0.9314,1.038,0.8782,0.95,0.8714,0.9214,0.9214};
+	vector<double> p4{0.,0.,0.,0.006239,0.004284,0.005151,0.004345,0.005245,0.005245};
+	vector<double> p5{0.,0.,0.,1.582,1.406,1.407,1.389,1.395,1.395};
 	double KappaValue;
 	
 	std::vector<std::vector<double>> yParticleContibution;
@@ -170,47 +115,15 @@ double TsGSM2::CalculateKappaFromSpectra()
 	hyfy = ySpectra_F -> Getyfy();
 	yF_particle = ySpectra_F -> GetyF_Particle();
 	
-	//DEBUGGING
-	/*for (int i=0;i<yBinNum;i++){
-		for (int particle = 0; particle<10; particle++){
-			cout << yParticleContibution[i][particle] << "  ";    
-		}  
-		cout << endl;
-	}*/ 
-	
-	std::vector<double> KappaParticle(9,0.0), TotalContributionParticle(9,0.0);
-	double sum_BinWidth;
-	// Evaluate total contribution by weighting on bin widths
-	for (int particle = 0; particle<9; particle++){
-		for (int i=0;i<yBinNum;i++){
-			sum_BinWidth += BinWidth[i];
-			TotalContributionParticle[particle] += BinWidth[i]*yParticleContibution[i][particle];    
-		} 
-	}
-	
-	for (int particle = 0; particle<9; particle++){
-		TotalContributionParticle[particle] = TotalContributionParticle[particle]/sum_BinWidth;
-	}
-	
-	double sum_Particle;
-	for (int particle = 0; particle<9; particle++){
-		sum_Particle += TotalContributionParticle[particle];
-	}
-	
-	// Renormalization of contributions
-	for (int particle = 0; particle<9; particle++){
-		TotalContributionParticle[particle] = TotalContributionParticle[particle]/sum_Particle;
-		cout << "Contribution " << TotalContributionParticle[particle] << endl; 
-	}
+	std::vector<double> KappaParticle(9,0.0), TotalContributionParticle(10,0.0);
+	TotalContributionParticle = ySpectra_F -> GetProbabilityContribution();
 	
 	// Calculate Kappa for each particle
 	for (int particle = 0; particle<9; particle++){
-		if (particle == 0)
-			KappaParticle[particle] = 9*(p1[particle]+pow((p2[particle]*yF_particle[particle]),p3[particle]))/(1+pow((p4[particle]*yF_particle[particle]),p5[particle]));
-		else if (particle == 8)
-			KappaParticle[particle] = 9*(p1[particle-2]+pow((p2[particle-2]*yF_particle[particle]),p3[particle-2]))/(1+pow((p4[particle-2]*yF_particle[particle]),p5[particle-2]));
+		if (particle == 0 || particle == 1 || particle == 2)
+			KappaParticle[particle] = 9*(p1[particle]+pow((p2[particle]*yF_particle[particle]),p3[particle]));
 		else
-			KappaParticle[particle] = 9*(p1[particle-1]+pow((p2[particle-1]*yF_particle[particle]),p3[particle-1]))/(1+pow((p4[particle-1]*yF_particle[particle]),p5[particle-1]));
+			KappaParticle[particle] = 9*(p1[particle]+pow((p2[particle]*yF_particle[particle]),p3[particle]))/(1+pow((p4[particle]*yF_particle[particle]),p5[particle]));
 		cout << "Kappa values " << KappaParticle[particle] << endl; 
 	}
 	

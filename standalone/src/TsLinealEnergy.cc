@@ -199,7 +199,15 @@ void TsLinealEnergy::GetSpectrum()
 		hdy[i] = hyfy[i]/yF;                                    //calculate d(y) = y*f(y)/yF (cf. Burigo et al., NIMB 320 (2014))
 		hydy[i] = (BinLimit[i]+BinLimit[i+1])/2*hdy[i];         // calculate y*d(y) = BinCenter * d(y)
 	}
-
+	
+	Probability_fy_Particle.resize(10);
+	for (int particle = 0; particle<10; particle++)
+	{	
+		for (int i=0;i<yBinNum;i++){
+			Probability_fy_Particle[particle] += hfy[i]*BinWidth[i]*yParticleContibution[i][particle]; 
+		}   
+		std::cout<<Probability_fy_Particle[particle]<<endl;  // DEBUGGING 
+	}
 
 	//******************************************************************
 	//               Validate d(y) & calculate yF

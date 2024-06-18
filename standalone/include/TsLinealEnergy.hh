@@ -65,6 +65,8 @@ class TsLinealEnergy
 
 		std::vector<double> GetyBinWidth() {return BinWidth;};
 		std::vector<double> GetyBinLimit() {return BinLimit;};
+		
+		std::vector<double> GetProbabilityContribution() {return Probability_fy_Particle;};
 
 		std::vector<std::vector<double>> GetParticleContribution() {return yParticleContibution;};
 	private:
@@ -90,6 +92,7 @@ class TsLinealEnergy
 	std::vector<double>  dy_var,  dy_std;
 
 	//std::vector<std::vector<double>> hfy_particle;
+	std::vector<double> Probability_fy_Particle;
 	std::vector<std::vector<double>> yParticleContibution;
 	double **hfy_particle;
 	std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth, yF_Particle;
