@@ -32,8 +32,8 @@
 
 using namespace std;
 
-TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
-	:fyParticleContribution(yParticleContribution), fyVector(yVector),fyVector_Particle(yVector_Particle),fBinLimit(hBinLimit), fBinWidth(hBinWidth), fhfy(hfy), fhdy(hdy), yF(hyF), yD(hyD), yF_var(hyF_var), yD_var(hyD_var), fy_var(hfy_var), dy_var(hdy_var),fSpecLength(SpecLength), fGetStatitisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetParticleContribution(GetParticleContribution)
+TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
+	:fyParticleContribution(yParticleContribution), fyVector(yVector),fyVector_Particle(yVector_Particle), fyVector_Nucleus(yVector_Nucleus), fyVector_Particle_Nucleus(yVector_Particle_Nucleus), fBinLimit(hBinLimit), fBinWidth(hBinWidth), fhfy(hfy), fhdy(hdy), yF(hyF), yD(hyD), yF_var(hyF_var), yD_var(hyD_var), fy_var(hfy_var), dy_var(hdy_var),fSpecLength(SpecLength), fGetStatitisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetParticleContribution(GetParticleContribution)
 {
 	// default values of MK model
 	// 10% cell survival relative to 200 kVp X-rays for HSG cells
@@ -322,7 +322,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SplitDoseIrradiation()
 
 	cout<<"Default parameters:"<<endl;
 	cout<<"1.The reference radiation is X-ray(200 kVp) with alpha = 0.19 Gy-1 and beta = 0.05 Gy-2"<<std::endl;
-	cout<<"2.THe biological end point is 10% survival of he human salivary gland (HSG) tumor cells."<<std::endl;
+	cout<<"2.THe biological end point is 10% survival of the human salivary gland (HSG) tumor cells."<<std::endl;
 	cout<<"Parameter used in this calculation:"     <<std::endl;
 	cout<<"alpha0="<<MKModel_alpha0<<" Gy-1; "<<"beta="<<MKModel_beta<<" Gy-2; "
 		<<"rd="<<MKModel_rd<<" um; "<< "Rn="<< MKModel_Rn <<" um; "<<"y0="<<MKModel_y0<<" keV/um; "
@@ -399,7 +399,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithDSMKModel()
 	vector<double> hfz = aSpecificEnergy_D->GetHfz();
 	vector<double> zBinWidth = aSpecificEnergy_D->GetBinWidth(); 
 
-	TsSpecificEnergy* aSpecificEnergy_C = new TsSpecificEnergy(fyVector_Particle, Rn, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	TsSpecificEnergy* aSpecificEnergy_C = new TsSpecificEnergy(fyVector_Particle_Nucleus, Rn, fGetStatitisticInfo, fSpectrumUpdateTimes);
 
 	std::vector<double> Szn, S, S_var, RBE, RBE_var;
 	std::vector<std::vector<double>> S_Particle, RBE_Particle;
@@ -783,7 +783,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 
 	double alphaX = GSM2_alphaX;
 	double betaX = GSM2_betaX;
-	TsGSM2* aGSM2 = new TsGSM2(yF,  GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, fyVector, fyVector_Particle, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	TsGSM2* aGSM2 = new TsGSM2(yF,  GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, fyVector, fyVector_Particle, fyVector_Nucleus, fyVector_Particle_Nucleus, fGetStatitisticInfo, fSpectrumUpdateTimes);
 	cout << MCMultieventIterations << endl;
 	vector<double> zBinCenter = aGSM2->GetZn();
 	vector<double> zBinWidth = aGSM2->GetzBinWidth();
@@ -921,7 +921,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 	}
 	std::cout<<"Default parameters:"<<endl;
 	std::cout<<"1.The reference radiation is X-ray(200 kVp) with alpha = 0.19 Gy-1 and beta = 0.05 Gy-2"<<std::endl;
-	std::cout<<"2.THe bilogical end point is 10% survival of he human salivary gland (HSG) tumor cells."<<std::endl;
+	std::cout<<"2.THe biological end point is 10% survival of the human salivary gland (HSG) tumor cells."<<std::endl;
 	std::cout<<"Parameter used in this calculation:"     <<std::endl;
 	// std::cout<<"alpha0="<<MKModel_alpha0<<" Gy-1; "<<"beta="<<MKModel_beta<<" Gy-2; "
 	//         <<"rd="<<MKModel_rd<<" um; "<< "Rn="<< MKModel_Rn <<" um; "<<"y0="<<MKModel_y0<<" keV/um; "
@@ -959,11 +959,11 @@ void TsGetSurvivalRBEQualityFactor::WriteGSM2Survival(string filename, std::vect
 	output << "# GSM2 Parameters\n#\n";
 	output << "# kappa = " << GSM2_kappa << " Gy-1\n"
 		<< "# lambda = " << GSM2_lambda << " Gy-1\n"
-		<< "# a = " << GSM2_a << "??\n"
-		<< "# b = " << GSM2_b << "??\n"
-		<< "# r = " << GSM2_r << "??\n"
+		<< "# a = " << GSM2_a << " \n"
+		<< "# b = " << GSM2_b << " \n"
+		<< "# r = " << GSM2_r << " \n"
 		<< "# AlphaX = " << GSM2_alphaX << " Gy-1 Reference radiation\n"
-		<< "# BetaX = " << GSM2_betaX << "Gy-2 Reference radiation\n"
+		<< "# BetaX = " << GSM2_betaX << " Gy-2 Reference radiation\n"
 		<< "# Domain Radius = " << GSM2_rd << " um\n"
 		<< "# Nucleus Radius = " << GSM2_Rn << " um\n"
 		<< "#\n";
@@ -1002,7 +1002,7 @@ void TsGetSurvivalRBEQualityFactor::WriteSurvivivalRBEParticleContribution(strin
 void TsGetSurvivalRBEQualityFactor::WriteQParticleContribution(string filename, std::vector<double> Vector_Particle)
 {
 
-	cout <<"MERDA"<< endl;
+	cout <<"NOT GOOD"<< endl;
 	std::ofstream outputParticle(filename);
 
 	outputParticle << "e-       Hprim    Hsec    He      Li      Be      B        C       Other    Total[Q]\n"; 

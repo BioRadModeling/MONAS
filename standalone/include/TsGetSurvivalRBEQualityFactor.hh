@@ -34,7 +34,7 @@ using namespace std;
 class TsGetSurvivalRBEQualityFactor 
 {
 	public:
-		TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, double*BinLimit, double* hBinWidth, double* hfy, double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double>hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimesi, bool GetParticleContribution);
+		TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, double*BinLimit, double* hBinWidth, double* hfy, double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double>hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimesi, bool GetParticleContribution);
 		~TsGetSurvivalRBEQualityFactor();
 
 		void GetSurvWithMKModel_SaturationCorr();
@@ -96,6 +96,8 @@ class TsGetSurvivalRBEQualityFactor
 		std::vector<double> fyVector;
 		std::vector<std::vector<double>> fyVector_Particle;
                 std::vector<std::vector<double>> fyParticleContribution;
+                std::vector<double> fyVector_Nucleus;
+		std::vector<std::vector<double>> fyVector_Particle_Nucleus;
 		double* fBinLimit;
 		double* fBinWidth;
 		double* fhy;

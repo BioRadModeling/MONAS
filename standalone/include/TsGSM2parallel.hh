@@ -45,7 +45,7 @@ using namespace std;
 class TsGSM2 
 {
 	public:
-		TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, bool GetStatisticInfo, int SpectrumUpdateTimes);
+		TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, bool GetStatisticInfo, int SpectrumUpdateTimes);
 		~TsGSM2();
 
 		//input solo parametri biologici
@@ -88,6 +88,8 @@ class TsGSM2
 		//y events per particle matrix
 		std::vector<double> fyVector;
 		std::vector<std::vector<double>> fyVector_Particle;
+		std::vector<double> fyVector_Nucleus;
+		std::vector<std::vector<double>> fyVector_Particle_Nucleus;
 
 		//microdosimetric z on cell domain
 		std::vector<double> hfz_D;

@@ -45,8 +45,8 @@
 
 using namespace std;
 
-TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, bool GetStatisticInfo, int SpectrumUpdateTimes)
-	:GSM2Model_yF(yF), GSM2Model_rd(Rd), GSM2Model_rc(Rc), GSM2_a(kinA), GSM2_b(kinB), GSM2_r(kinR), fyVector(yVector), fyVector_Particle(yVector_Particle), fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes)
+TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, bool GetStatisticInfo, int SpectrumUpdateTimes)
+	:GSM2Model_yF(yF), GSM2Model_rd(Rd), GSM2Model_rc(Rc), GSM2_a(kinA), GSM2_b(kinB), GSM2_r(kinR), fyVector(yVector), fyVector_Particle(yVector_Particle), fyVector_Nucleus(yVector_Nucleus), fyVector_Particle_Nucleus(yVector_Particle_Nucleus), fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes)
 {
 	// Old Kappa and lambda
 	// double nDBS = 139.6*exp(0.0002568*GSM2Model_yF) -92.28*exp(-0.01855*GSM2Model_yF);
@@ -68,6 +68,8 @@ TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double
 		<< "kinetic r: " << GSM2_r <<endl
 		<< "**********************************\n";
 
+	// INSERT THE INFO FROM THE DOMAIN SPECTRUM (domain-size scoring volume, R = 0.8um)
+	// Rescaling factor: y2z_factor = 0.16/(pi*rho*fRadius*fRadius) in TsSpecificEnergy.cc
 	TsSpecificEnergy* zSpectra_D = new TsSpecificEnergy(fyVector_Particle, GSM2Model_rd, fGetStatisticInfo, fSpectrumUpdateTimes);
 	fSpecificEnergy_D = zSpectra_D;
 
@@ -80,9 +82,9 @@ TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double
 	zF_D = fSpecificEnergy_D->GetzF();
 	hzfz_cumulative_D = fSpecificEnergy_D->GetHzfzCumulative();
 	
-	// HERE TO INSERT THE INFO FROM THE SECOND SPECTRUM ! Change with a second fyVector_Particle from the spectra with R = 8um (All other times R = 0.8um is used)
-	// Is there a rescaling factor fixed to correct for the double scale of the micro sensitive volume?
-	TsSpecificEnergy* zSpectra_C = new TsSpecificEnergy(fyVector_Particle, GSM2Model_rc, fGetStatisticInfo, fSpectrumUpdateTimes);
+	// INSERT THE INFO FROM THE NUCLEUS SPECTRUM (nucleus-size scoring volume, R = 8um)
+	// Rescaling factor: y2z_factor = 0.16/(pi*rho*fRadius*fRadius) in TsSpecificEnergy.cc
+	TsSpecificEnergy* zSpectra_C = new TsSpecificEnergy(fyVector_Particle_Nucleus, GSM2Model_rc, fGetStatisticInfo, fSpectrumUpdateTimes);
 	fSpecificEnergy_C = zSpectra_C;
 	zF_C = fSpecificEnergy_C->GetzF();
 	hzfz_cumulative_C = fSpecificEnergy_C -> GetHzfzCumulative();
@@ -152,7 +154,7 @@ double TsGSM2::CalculateKappaFromSpectra()
 	// New formulation of Kappa and Lambda from PARTRAC simulations on DSBsites (Kundrát, Baiocco et al.)	
 	// "Total DSBsites yield" parameters (H,H_sec,He,Li,Be,B,C) e- and other missing (first and ninth column)
 	
-	TsLinealEnergy* ySpectra_F = new TsLinealEnergy(fyVector,fyVector_Particle);
+	TsLinealEnergy* ySpectra_F = new TsLinealEnergy(fyVector_Nucleus,fyVector_Particle_Nucleus); // yF scored in a nucleus-size volume
 	
 	vector<double> p1{6.8,6.8,6.8,6.8,6.8,6.8,6.8};  	                  
 	vector<double> p2{0.1773,0.1773,0.1471,0.1653,0.1425,0.1587,0.156};

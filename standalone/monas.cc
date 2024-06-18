@@ -87,6 +87,7 @@ int main(int argc, char *argv[])
 	////////////////////////////////////////////////////////////
 
 	string TopasScorerFile;
+	string TopasScorerFile_Nucleus; // new line
 	string BioWeightFunctionDataFile = "BioWeightFuncData_interpolation.txt";
 	//Loop on inputs
 	for(int i=0; i<argc; i++)
@@ -134,7 +135,8 @@ int main(int argc, char *argv[])
 			Doses = {stod(argv[i+1]), stod(argv[i+2]), stod(argv[i+3])};
 		}
 
-		if(strcmp(argv[i],"-topasScorer") == 0) {TopasScorerFile = argv[i+1];} //input file
+		if(strcmp(argv[i],"-topasScorer_08") == 0) {TopasScorerFile = argv[i+1];} //input file
+		if(strcmp(argv[i],"-topasScorer_8") == 0) {TopasScorerFile_Nucleus = argv[i+1];} //input file // new line
 		if(strcmp(argv[i],"-help") == 0) 
 		{
 			cout 	<<"-Rd: Domain radius [um]" <<endl
@@ -187,6 +189,47 @@ int main(int argc, char *argv[])
 		yVector.push_back(y_total);  
 	}
 	infile.close();
+	
+	
+	/////////////////////////////////////////////////////////////
+	//
+	// READ TOPAS SCORER FOR NUCLEUS // new line
+	//
+	////////////////////////////////////////////////////////////
+
+	vector<vector<double>> yVector_Particle_Nucleus;
+	vector<double>  yVector_Nucleus;
+
+    	ifstream infile_Nucleus(&TopasScorerFile_Nucleus[0]);
+	if(infile_Nucleus.fail()) // checks to see if file opended 
+	{
+		cout << "ERROR::" <<TopasScorerFile_Nucleus <<" NOT FOUND!!!" << endl;
+		return -1; // no point continuing if the file didn't open...
+	}
+	while(!infile_Nucleus.eof()) // reads file to end of *file*, not line
+	{ 
+
+		double y_total, y_z0, y_z1_prim, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
+		//double y_total, y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
+		infile_Nucleus >> y_total 
+			>> y_z0
+			>> y_z1_prim
+			//>> y_z1_seco
+			>> y_z2
+			>> y_z3
+			>> y_z4
+			>> y_z5
+			>> y_z6
+			>> y_z_;
+
+		vector<double> yParticle {y_z0, y_z1_prim, 0, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+		
+		//vector<double> yParticle {y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+		
+		yVector_Particle_Nucleus.push_back(yParticle);
+		yVector_Nucleus.push_back(y_total);  
+	}
+	infile_Nucleus.close();
 
 
 	/////////////////////////////////////////////////////////////
@@ -214,7 +257,7 @@ int main(int argc, char *argv[])
 	vector<vector<double>> contribution = aLinealEnergy -> GetParticleContribution();
 	hydy = aLinealEnergy->Getydy();
 
-	TsGetSurvivalRBEQualityFactor *aSurvRBEQf = new TsGetSurvivalRBEQualityFactor(contribution, yVector, yVector_Particle, &BinLimit[0], &BinWidth[0], &hfy[0], &hdy[0], yF, yD, yF_var, yD_var, fy_var, dy_var, yBinNum, fGetStatitisticInfo, fSpectrumUpdateTimes, fGetParticleContribution);
+	TsGetSurvivalRBEQualityFactor *aSurvRBEQf = new TsGetSurvivalRBEQualityFactor(contribution, yVector, yVector_Particle, yVector_Nucleus, yVector_Particle_Nucleus, &BinLimit[0], &BinWidth[0], &hfy[0], &hdy[0], yF, yD, yF_var, yD_var, fy_var, dy_var, yBinNum, fGetStatitisticInfo, fSpectrumUpdateTimes, fGetParticleContribution);
 	
 	aSurvRBEQf->SetDosesMacro(&Doses[0]);
 	aSurvRBEQf -> SetMCMultieventIterations(fSetMultiEventStatistic);
