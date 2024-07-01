@@ -121,6 +121,9 @@ class TsGSM2
 		const double yBinMagnitude = 5.;
 		double **hfy_particle;
 		std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth;
+		
+		
+		TsLinealEnergy* ySpectra_F;
 };
 
 

@@ -48,6 +48,8 @@ using namespace std;
 TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, bool GetStatisticInfo, int SpectrumUpdateTimes)
 	:GSM2Model_yF(yF), GSM2Model_rd(Rd), GSM2Model_rc(Rc), GSM2_a(kinA), GSM2_b(kinB), GSM2_r(kinR), fyVector(yVector), fyVector_Particle(yVector_Particle), fyVector_Nucleus(yVector_Nucleus), fyVector_Particle_Nucleus(yVector_Particle_Nucleus), fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes)
 {
+	ySpectra_F = new TsLinealEnergy(fyVector_Nucleus,fyVector_Particle_Nucleus); // This is changed into a private variable in order to use it everywhere in the class
+	
 	// INSERT THE INFO FROM THE DOMAIN SPECTRUM (domain-size scoring volume, R = 0.8um)
 	// Rescaling factor: y2z_factor = 0.16/(pi*rho*fRadius*fRadius) in TsSpecificEnergy.cc
 	TsSpecificEnergy* zSpectra_D = new TsSpecificEnergy(fyVector_Particle, GSM2Model_rd, fGetStatisticInfo, fSpectrumUpdateTimes);
@@ -98,7 +100,7 @@ double TsGSM2::CalculateKappaFromSpectra()
 	// New formulation of Kappa and Lambda from PARTRAC simulations on DSBsites (Kundrát, Baiocco et al.)	
 	// "Total DSBsites yield" parameters (e-,H,H_sec,He,Li,Be,B,C,others)
 	
-	TsLinealEnergy* ySpectra_F = new TsLinealEnergy(fyVector_Nucleus,fyVector_Particle_Nucleus); // yF scored in a nucleus-size volume
+	//TsLinealEnergy* ySpectra_F = new TsLinealEnergy(fyVector_Nucleus,fyVector_Particle_Nucleus); // yF scored in a nucleus-size volume
 	
 	vector<double> p1{6.8,6.8,6.8,6.8,6.8,6.8,6.8,6.8,6.8}; 	                  
 	vector<double> p2{0.1773,0.1773,0.1773,0.1471,0.1653,0.1425,0.1587,0.156,0.156};
@@ -180,28 +182,33 @@ double TsGSM2::CalculateKappaFromSpectra()
 	//return KappaValue;
 	
 	// SECOND VERSION 
-	KappaValue = 0;
-	for(int particle = 0; particle<9; particle++){
-		KappaValue += KappaParticle_ztot[particle]*KappaParticle_ztot[particle]*TotalContributionParticle[particle];
-	}
-	cout << "SUM[Kappa^2(y_i)*p_i] = " << KappaValue << endl; 
-	//return KappaValue;
+	cout << "SUM[Kappa(y_i/nu)*p_i] = " << KappaValue << endl; 
 	
-	// THIRD VERSION 
-	KappaValue = 0;
-	for(int particle = 0; particle<9; particle++){
-		if(TotalContributionParticle[particle] > 0){
-			KappaValue += (KappaParticle_ztot[particle]*KappaParticle_ztot[particle]*TotalContributionParticle[particle])/(KappaParticle_ztot[particle]*TotalContributionParticle[particle]);
-		}
-	}
-	cout << "SUM[Kappa^2(y_i)*p_i]/SUM[Kappa(y_i)*p_i] = " << KappaValue << endl; 
-	//return KappaValue;
+	// THIRD VERSION (internal)
+	cout << "SUM[Kappa(z_j)*p_i] = " << KappaValue << endl;
+	
 	*/
 }
 
 // Calculation p0X and p0Y (initial damage distributions)
 void TsGSM2::ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vector<double> &p0y, double zn, int NumberOfSamples)
 {		
+	// Conversion factor z -> y
+	double z_to_y_factor = (4*GSM2Model_rd*GSM2Model_rd)/0.204;
+	// Conversion Kappa
+	double kappa_conversion = pow(GSM2Model_rd/GSM2Model_rc,3);
+	
+	vector<double> p1{6.8,6.8,6.8,6.8,6.8,6.8,6.8,6.8,6.8}; 	                  
+	vector<double> p2{0.1773,0.1773,0.1773,0.1471,0.1653,0.1425,0.1587,0.156,0.156};
+	vector<double> p3{0.9314,0.9314,0.9314,1.038,0.8782,0.95,0.8714,0.9214,0.9214};
+	vector<double> p4{0.,0.,0.,0.006239,0.004284,0.005151,0.004345,0.005245,0.005245};
+	vector<double> p5{0.,0.,0.,1.582,1.406,1.407,1.389,1.395,1.395};
+	double KappaValue;
+	
+	std::vector<double> TotalContributionParticle(10,0.0);
+	TotalContributionParticle = ySpectra_F -> GetProbabilityContribution();
+	
+			
 	std::default_random_engine generator;
 	std::uniform_real_distribution<double> uniform(0.0,1.);
 	double rU;
@@ -233,13 +240,38 @@ void TsGSM2::ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vecto
 		}//chiudo if()
 		else
 			z_tot = zBinCenter[0]; //CHIUDERE
-
+		
+		// KAPPA CALCULATION
+		
+		// Kappa(z_tot*conversion/nu)
+		// Calculation y_i for each particle
+		std::vector<double> y_i_particle(9,0.0);
+		for (int particle = 0; particle<9; particle++){
+			y_i_particle[particle] = (z_tot*z_to_y_factor*TotalContributionParticle[particle])/rP;
+		}
+		
+		// Calculate Kappa for each particle
+		std::vector<double> KappaParticle_ztot(9,0.0);
+		for (int particle = 0; particle<9; particle++){
+			if (particle == 0 || particle == 1 || particle == 2)
+				KappaParticle_ztot[particle] = 9*(p1[particle]+pow((p2[particle]*y_i_particle[particle]),p3[particle]));
+			else
+				KappaParticle_ztot[particle] = 9*(p1[particle]+pow((p2[particle]*y_i_particle[particle]),p3[particle]))/(1+pow((p4[particle]*y_i_particle[particle]),p5[particle]));
+		}
+		 
+		KappaValue = 0;
+		for(int particle = 0; particle<9; particle++){
+			KappaValue += KappaParticle_ztot[particle]*TotalContributionParticle[particle];
+		}
+		
 		//PASSAGGIO 3
 		//ESTRAGGO I DANNI DA TUTTE LE TRACCE
-		std::poisson_distribution<int> poissonX(GSM2Model_kappa*z_tot);
+		//std::poisson_distribution<int> poissonX(GSM2Model_kappa*z_tot);
+		std::poisson_distribution<int> poissonX(kappa_conversion*KappaValue*z_tot);
 		double x0 = poissonX(generator); //numero di danni
 
-		std::poisson_distribution<int> poissonY(GSM2Model_lambda*z_tot);
+		//std::poisson_distribution<int> poissonY(GSM2Model_lambda*z_tot);
+		std::poisson_distribution<int> poissonY(kappa_conversion*KappaValue*z_tot*1e-3);
 		double y0 = poissonY(generator); //numero di danni
 
 		p0x.push_back(x0);
