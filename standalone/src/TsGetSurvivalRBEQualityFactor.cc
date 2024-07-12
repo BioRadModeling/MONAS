@@ -901,7 +901,8 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 
 //	fn_Nucleus.close(); //DEBUG
 
-
+	// TO DO: LQ/linear fit function and then add to WriteGSM2Survival
+	
 	WriteGSM2Survival("GSM2.csv", Doses, S, S_var, RBE, RBE_var);
 
 	if(fGetParticleContribution)
