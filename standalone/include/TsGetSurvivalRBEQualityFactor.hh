@@ -53,6 +53,12 @@ class TsGetSurvivalRBEQualityFactor
 		void WriteGSM2Survival(string filename, std::vector<double> D, std::vector<double> S, std::vector<double> Svar, std::vector<double> RBE, std::vector<double> RBEvar);
 		void WriteSurvivivalRBEParticleContribution(string filename, std::vector<double> D, std::vector<std::vector<double>> Vector_Particle);
 		void WriteQParticleContribution(string filename, std::vector<double> Vector_Particle);
+		
+		// TO DO: LQ/linear fit functions
+		vector<double> logTransform(const vector<double>& S);
+		void quadraticFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& beta);
+		void linearFit(const vector<double>& doses, const vector<double>& logS, double& alpha);
+		double calculateDose(double alpha, double beta, double targetS);
 
 		void SetDosesMacro(double* vec) 
 		{ 

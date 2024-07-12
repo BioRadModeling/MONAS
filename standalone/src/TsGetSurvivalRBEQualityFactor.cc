@@ -902,6 +902,41 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 //	fn_Nucleus.close(); //DEBUG
 
 	// TO DO: LQ/linear fit function and then add to WriteGSM2Survival
+	// Transform S in -log(S)
+	vector<double> logS = logTransform(S);
+
+	// LQ Fit
+	double alpha, beta;
+	quadraticFit(Doses, logS, alpha, beta);
+
+	// Check of beta value
+	if (beta <= 0) {
+		// Linear fit
+		cout << "Linear fit: " << endl;
+		linearFit(Doses, logS, alpha);
+		cout << "alpha = " << alpha << ", beta = 0" << endl;
+	} else {
+		// LQ fit
+		cout << "LQ fit: " << endl;
+		cout << "alpha = " << alpha << ", beta = " << beta << endl;
+	}
+	
+	// RBE10 calculation
+	double rbe10,dose10;
+	
+	// Dose at 10% calculation
+	double targetS = 0.1;
+	double Dose10 = calculateDose(alpha, beta, targetS);
+
+	if (Dose10 >= 0) {
+		cout << "Dose for S = " << targetS << " is: " << Dose10 << endl;
+	}
+	
+	rbe10 = (sqrt( (alphaX*alphaX) - (4*betaX*log(targetS)) ) - alphaX)/(2*betaX*Dose10);
+	
+	cout << "RBE10 with GSM2 = " << rbe10 << endl;
+	
+	///////////////////////////////////////////////////////
 	
 	WriteGSM2Survival("GSM2.csv", Doses, S, S_var, RBE, RBE_var);
 
@@ -1013,4 +1048,94 @@ void TsGetSurvivalRBEQualityFactor::WriteQParticleContribution(string filename, 
 	outputParticle << std::endl;
 
 	outputParticle.close();
+}
+
+
+// TO DO: LQ/linear fit functions
+// Natural logarithm and minus sign
+vector<double> TsGetSurvivalRBEQualityFactor::logTransform(const vector<double>& S) {
+    vector<double> logS(S.size());
+    for (size_t i = 0; i < S.size(); ++i) {
+        logS[i] = -log(S[i]);
+    }
+    return logS;
+}
+
+// LQ fitting
+void TsGetSurvivalRBEQualityFactor::quadraticFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& beta) {
+    int n = doses.size();
+    double sumX = 0, sumY = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0, sumXY = 0, sumX2Y = 0;
+
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        sumX += x;
+        sumY += y;
+        sumX2 += x * x;
+        sumX3 += x * x * x;
+        sumX4 += x * x * x * x;
+        sumXY += x * y;
+        sumX2Y += x * x * y;
+    }
+
+    double D = n * (sumX2 * sumX4 - sumX3 * sumX3) - sumX * (sumX * sumX4 - sumX3 * sumX2) + sumX2 * (sumX * sumX3 - sumX2 * sumX2);
+    double D_alpha = n * (sumXY * sumX4 - sumX3 * sumX2Y) - sumY * (sumX * sumX4 - sumX3 * sumX2) + sumX2 * (sumX * sumX2Y - sumXY * sumX2);
+    double D_beta = n * (sumX2 * sumX2Y - sumXY * sumX3) - sumX * (sumX * sumX2Y - sumXY * sumX2) + sumY * (sumX * sumX3 - sumX2 * sumX2);
+
+    alpha = D_alpha / D;
+    beta = D_beta / D;
+}
+
+
+// Linear fitting
+void TsGetSurvivalRBEQualityFactor::linearFit(const vector<double>& doses, const vector<double>& logS, double& alpha) {
+    int n = doses.size();
+    double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumX2 += x * x;
+    }
+
+    alpha = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+}
+
+// Calculate Dose give target survival probability
+double TsGetSurvivalRBEQualityFactor::calculateDose(double alpha, double beta, double targetS) {
+    double targetLogS = -log(targetS);
+
+    if (beta == 0) {
+        // Linear equation: targetLogS = alpha * dose
+        return (targetLogS) / alpha;
+    } else {
+        // Quadratic equation: targetLogS = alpha * dose + beta * dose^2
+        double a = beta;
+        double b = alpha;
+        double c = - targetLogS;
+        
+        double discriminant = b * b - 4 * a * c;
+        if (discriminant < 0) {
+            cerr << "No real solution" << endl;
+            return -1;
+        }
+
+        double dose1 = (-b + sqrt(discriminant)) / (2 * a);
+        double dose2 = (-b - sqrt(discriminant)) / (2 * a);
+
+        // Return Dose
+        if (dose1 >= 0 && dose2 >= 0) {
+            return min(dose1, dose2);
+        } else if (dose1 >= 0) {
+            return dose1;
+        } else if (dose2 >= 0) {
+            return dose2;
+        } else {
+            cerr << "No real solution" << endl;
+            return -1;
+        }
+    }
 }
