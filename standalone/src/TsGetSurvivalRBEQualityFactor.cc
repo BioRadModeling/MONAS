@@ -936,6 +936,8 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 	
 	cout << "RBE10 with GSM2 = " << rbe10 << endl;
 	
+	Write_yD_RBE10("yDvsRBE10.csv", yD, Dose10, rbe10);
+	
 	///////////////////////////////////////////////////////
 	
 	WriteGSM2Survival("GSM2.csv", Doses, S, S_var, RBE, RBE_var);
@@ -1138,4 +1140,56 @@ double TsGetSurvivalRBEQualityFactor::calculateDose(double alpha, double beta, d
             return -1;
         }
     }
+}
+
+void TsGetSurvivalRBEQualityFactor::Write_yD_RBE10(string filename, double yD, double Dose10, double RBE10)
+{
+	
+	// Check if file exists
+	   
+	std::ifstream infile(filename);
+	bool exists = infile.good();
+	infile.close();
+	    
+	std::ofstream output(filename, std::ios::app); // Append mode
+	    
+	if (!exists) {
+		output << "# GSM2 Parameters\n#\n";
+		output << "# a = " << GSM2_a << " \n"
+		       << "# b = " << GSM2_b << " \n"
+		       << "# r = " << GSM2_r << " \n"
+		       << "# AlphaX = " << GSM2_alphaX << " Gy-1 Reference radiation\n"
+		       << "# BetaX = " << GSM2_betaX << " Gy-2 Reference radiation\n"
+		       << "# Domain Radius = " << GSM2_rd << " um\n"
+		       << "# Nucleus Radius = " << GSM2_Rn << " um\n"
+		       << "#\n";
+		output << "# yD [keV/um], Dose at 10%, RBE10\n";
+	}
+	    
+	// Print values
+	output << std::fixed << std::setprecision(7) << yD << ",  " << Dose10 << ",  " << RBE10 << ",  ";
+	output << std::endl;
+
+	output.close();
+	
+	/*std::ofstream output(filename, std::ios::app); // Append mode
+	
+	output << "# GSM2 Parameters\n#\n";
+	output << "# a = " << GSM2_a << " \n"
+		<< "# b = " << GSM2_b << " \n"
+		<< "# r = " << GSM2_r << " \n"
+		<< "# AlphaX = " << GSM2_alphaX << " Gy-1 Reference radiation\n"
+		<< "# BetaX = " << GSM2_betaX << " Gy-2 Reference radiation\n"
+		<< "# Domain Radius = " << GSM2_rd << " um\n"
+		<< "# Nucleus Radius = " << GSM2_Rn << " um\n"
+		<< "#\n";
+
+	output << "# yD [keV/um], Dose at 10%, RBE10\n";
+
+    	// Print values
+    	output << std::fixed << std::setprecision(7) << yD << ",  " << Dose10 << ",  " << RBE10 << ",  ";
+
+    	output << std::endl;
+
+    	output.close();*/
 }

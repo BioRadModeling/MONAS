@@ -238,7 +238,8 @@ int main(int argc, char *argv[])
 	//
 	////////////////////////////////////////////////////////////
 
-	TsLinealEnergy* aLinealEnergy = new TsLinealEnergy(yVector, yVector_Particle);
+	//TsLinealEnergy* aLinealEnergy = new TsLinealEnergy(yVector, yVector_Particle);
+	TsLinealEnergy* aLinealEnergy = new TsLinealEnergy(yVector_Nucleus, yVector_Particle_Nucleus);
 	BinLimit = aLinealEnergy->GetyBinLimit();
 	BinWidth = aLinealEnergy->GetyBinWidth();
 	hfy = aLinealEnergy -> Getfy();
