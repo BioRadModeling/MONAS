@@ -1144,9 +1144,7 @@ double TsGetSurvivalRBEQualityFactor::calculateDose(double alpha, double beta, d
 
 void TsGetSurvivalRBEQualityFactor::Write_yD_RBE10(string filename, double yD, double Dose10, double RBE10)
 {
-	
 	// Check if file exists
-	   
 	std::ifstream infile(filename);
 	bool exists = infile.good();
 	infile.close();
@@ -1163,7 +1161,7 @@ void TsGetSurvivalRBEQualityFactor::Write_yD_RBE10(string filename, double yD, d
 		       << "# Domain Radius = " << GSM2_rd << " um\n"
 		       << "# Nucleus Radius = " << GSM2_Rn << " um\n"
 		       << "#\n";
-		output << "# yD [keV/um], Dose at 10%, RBE10\n";
+		output << "yD, Dose10, RBE10\n";
 	}
 	    
 	// Print values
@@ -1171,25 +1169,4 @@ void TsGetSurvivalRBEQualityFactor::Write_yD_RBE10(string filename, double yD, d
 	output << std::endl;
 
 	output.close();
-	
-	/*std::ofstream output(filename, std::ios::app); // Append mode
-	
-	output << "# GSM2 Parameters\n#\n";
-	output << "# a = " << GSM2_a << " \n"
-		<< "# b = " << GSM2_b << " \n"
-		<< "# r = " << GSM2_r << " \n"
-		<< "# AlphaX = " << GSM2_alphaX << " Gy-1 Reference radiation\n"
-		<< "# BetaX = " << GSM2_betaX << " Gy-2 Reference radiation\n"
-		<< "# Domain Radius = " << GSM2_rd << " um\n"
-		<< "# Nucleus Radius = " << GSM2_Rn << " um\n"
-		<< "#\n";
-
-	output << "# yD [keV/um], Dose at 10%, RBE10\n";
-
-    	// Print values
-    	output << std::fixed << std::setprecision(7) << yD << ",  " << Dose10 << ",  " << RBE10 << ",  ";
-
-    	output << std::endl;
-
-    	output.close();*/
 }
