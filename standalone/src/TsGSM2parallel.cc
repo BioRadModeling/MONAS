@@ -266,12 +266,12 @@ void TsGSM2::ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vecto
 		
 		//PASSAGGIO 3
 		//ESTRAGGO I DANNI DA TUTTE LE TRACCE
-		std::poisson_distribution<int> poissonX(GSM2Model_kappa*z_tot);
-		//std::poisson_distribution<int> poissonX(kappa_conversion*KappaValue*z_tot);
+		//std::poisson_distribution<int> poissonX(GSM2Model_kappa*z_tot);
+		std::poisson_distribution<int> poissonX(kappa_conversion*KappaValue*z_tot);
 		double x0 = poissonX(generator); //numero di danni
 
-		std::poisson_distribution<int> poissonY(GSM2Model_lambda*z_tot);
-		//std::poisson_distribution<int> poissonY(kappa_conversion*KappaValue*z_tot*1e-3);
+		//std::poisson_distribution<int> poissonY(GSM2Model_lambda*z_tot);
+		std::poisson_distribution<int> poissonY(kappa_conversion*KappaValue*z_tot*1e-3);
 		double y0 = poissonY(generator); //numero di danni
 
 		p0x.push_back(x0);

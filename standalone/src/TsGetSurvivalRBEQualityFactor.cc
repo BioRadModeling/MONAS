@@ -906,14 +906,17 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 	vector<double> logS = logTransform(S);
 
 	// LQ Fit
-	double alpha, beta;
-	quadraticFit(Doses, logS, alpha, beta);
+	double alpha, beta, error;
+	quadraticFit(Doses, logS, alpha, beta, error);
+	cout << "Error LQ fit: " << error << endl;
+	linearFit(Doses, logS, alpha, error);
+	cout << "Error linear fit: " << error << endl;
 
 	// Check of beta value
 	if (beta <= 0) {
 		// Linear fit
 		cout << "Linear fit: " << endl;
-		linearFit(Doses, logS, alpha);
+		linearFit(Doses, logS, alpha, error);
 		cout << "alpha = " << alpha << ", beta = 0" << endl;
 	} else {
 		// LQ fit
@@ -1064,7 +1067,7 @@ vector<double> TsGetSurvivalRBEQualityFactor::logTransform(const vector<double>&
 }
 
 // LQ fitting
-void TsGetSurvivalRBEQualityFactor::quadraticFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& beta) {
+void TsGetSurvivalRBEQualityFactor::quadraticFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& beta, double& error) {
     int n = doses.size();
     double sumX = 0, sumY = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0, sumXY = 0, sumX2Y = 0;
 
@@ -1086,11 +1089,21 @@ void TsGetSurvivalRBEQualityFactor::quadraticFit(const vector<double>& doses, co
 
     alpha = D_alpha / D;
     beta = D_beta / D;
+    
+    // Calculate the residual sum of squares (RSS)
+    double rss = 0;
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        double y_fit = alpha * x + beta * x * x;
+        rss += (y - y_fit) * (y - y_fit);
+    }
+    error = rss;
 }
 
 
 // Linear fitting
-void TsGetSurvivalRBEQualityFactor::linearFit(const vector<double>& doses, const vector<double>& logS, double& alpha) {
+void TsGetSurvivalRBEQualityFactor::linearFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& error) {
     int n = doses.size();
     double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
 
@@ -1104,6 +1117,16 @@ void TsGetSurvivalRBEQualityFactor::linearFit(const vector<double>& doses, const
     }
 
     alpha = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    
+    // Calculate the residual sum of squares (RSS)
+    double rss = 0;
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        double y_fit = alpha * x;
+        rss += (y - y_fit) * (y - y_fit);
+    }
+    error = rss;
 }
 
 // Calculate Dose give target survival probability
