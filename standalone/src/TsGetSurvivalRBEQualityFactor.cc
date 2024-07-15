@@ -32,8 +32,8 @@
 
 using namespace std;
 
-TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<std::vector<double>> yVector_Particle, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
-	:fyParticleContribution(yParticleContribution), fyVector_Particle(yVector_Particle),fBinLimit(hBinLimit), fBinWidth(hBinWidth), fhfy(hfy), fhdy(hdy), yF(hyF), yD(hyD), yF_var(hyF_var), yD_var(hyD_var), fy_var(hfy_var), dy_var(hdy_var),fSpecLength(SpecLength), fGetStatitisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetParticleContribution(GetParticleContribution)
+TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
+	:fyParticleContribution(yParticleContribution), fyVector(yVector),fyVector_Particle(yVector_Particle), fyVector_Nucleus(yVector_Nucleus), fyVector_Particle_Nucleus(yVector_Particle_Nucleus), fBinLimit(hBinLimit), fBinWidth(hBinWidth), fhfy(hfy), fhdy(hdy), yF(hyF), yD(hyD), yF_var(hyF_var), yD_var(hyD_var), fy_var(hfy_var), dy_var(hdy_var),fSpecLength(SpecLength), fGetStatitisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetParticleContribution(GetParticleContribution)
 {
 	// default values of MK model
 	// 10% cell survival relative to 200 kVp X-rays for HSG cells
@@ -66,7 +66,7 @@ TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::ve
 	GSM2_alphaX 	= 0.19;
 	GSM2_betaX 	= 0.05;
 	//Macroscopic Doses
-	Doses = {0, 1,2,3,4,5,6,7,8,9,10}; //Unit:Gy
+	Doses = {0,1,2,3,4,5,6,7,8,9,10}; //Unit:Gy
 
 	//MultiEventIterations
 	MCMultieventIterations = 1e4;
@@ -322,7 +322,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SplitDoseIrradiation()
 
 	cout<<"Default parameters:"<<endl;
 	cout<<"1.The reference radiation is X-ray(200 kVp) with alpha = 0.19 Gy-1 and beta = 0.05 Gy-2"<<std::endl;
-	cout<<"2.THe bilogical end point is 10% survival of he human salivary gland (HSG) tumor cells."<<std::endl;
+	cout<<"2.THe biological end point is 10% survival of the human salivary gland (HSG) tumor cells."<<std::endl;
 	cout<<"Parameter used in this calculation:"     <<std::endl;
 	cout<<"alpha0="<<MKModel_alpha0<<" Gy-1; "<<"beta="<<MKModel_beta<<" Gy-2; "
 		<<"rd="<<MKModel_rd<<" um; "<< "Rn="<< MKModel_Rn <<" um; "<<"y0="<<MKModel_y0<<" keV/um; "
@@ -399,7 +399,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithDSMKModel()
 	vector<double> hfz = aSpecificEnergy_D->GetHfz();
 	vector<double> zBinWidth = aSpecificEnergy_D->GetBinWidth(); 
 
-	TsSpecificEnergy* aSpecificEnergy_C = new TsSpecificEnergy(fyVector_Particle, Rn, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	TsSpecificEnergy* aSpecificEnergy_C = new TsSpecificEnergy(fyVector_Particle_Nucleus, Rn, fGetStatitisticInfo, fSpectrumUpdateTimes);
 
 	std::vector<double> Szn, S, S_var, RBE, RBE_var;
 	std::vector<std::vector<double>> S_Particle, RBE_Particle;
@@ -772,7 +772,7 @@ void TsGetSurvivalRBEQualityFactor::GetQualityFactorWithKellereHahn()
 		cout << "MERDA1"<< endl;
 		WriteQParticleContribution("QKellerer_Particle.csv", QComponents);
 	}
-	std::cout<<"******************** Get Quality Factor with Kellerer-Hahn approximation **************************"<<std::endl;
+	std::cout<<"****************kappa**** Get Quality Factor with Kellerer-Hahn approximation **************************"<<std::endl;
 	std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<"Q = "<<Q;
 	std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< Q_std<<")"<<std::endl;
 	std::cout<<"***************************************************************************************\n"<<std::endl;
@@ -783,7 +783,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 
 	double alphaX = GSM2_alphaX;
 	double betaX = GSM2_betaX;
-	TsGSM2* aGSM2 = new TsGSM2(yF,  GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, fyVector_Particle, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	TsGSM2* aGSM2 = new TsGSM2(yF,  GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, fyVector, fyVector_Particle, fyVector_Nucleus, fyVector_Particle_Nucleus, fGetStatitisticInfo, fSpectrumUpdateTimes);
 	cout << MCMultieventIterations << endl;
 	vector<double> zBinCenter = aGSM2->GetZn();
 	vector<double> zBinWidth = aGSM2->GetzBinWidth();
@@ -826,7 +826,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		{
 			end = clock();
 			float duration = (float) (end - start)/ CLOCKS_PER_SEC;
-			std::cout << (update/tenPercent)*10<< " % of Radiobiological model update finished, total time used :"<<duration<<" sec; ("<<duration/60<<" min)"<<std::endl;
+			std::cout << (update/tenPercent)*10<< '%' << " of Radiobiological model update finished, total time used :"<<duration<<" sec; ("<<duration/60<<" min)"<<std::endl;
 
 		}	
 		update++;
@@ -893,7 +893,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		{
 			end = clock();
 			float duration = (float) (end - start)/ CLOCKS_PER_SEC;
-			std::cout << (update/tenPercent)*10<< " % of Radiobiological model update finished, total time used :"<<duration<<" sec; ("<<duration/60<<" min)"<<std::endl;
+			std::cout << (update/tenPercent)*10 << '%' << " of Radiobiological model update finished, total time used :"<<duration<<" sec; ("<<duration/60<<" min)"<<std::endl;
 
 		}	
 		update++;
@@ -901,7 +901,48 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 
 //	fn_Nucleus.close(); //DEBUG
 
+	// TO DO: LQ/linear fit function and then add to WriteGSM2Survival
+	// Transform S in -log(S)
+	vector<double> logS = logTransform(S);
 
+	// LQ Fit
+	double alpha, beta, error;
+	quadraticFit(Doses, logS, alpha, beta, error);
+	cout << "Error LQ fit: " << error << endl;
+	linearFit(Doses, logS, alpha, error);
+	cout << "Error linear fit: " << error << endl;
+
+	// Check of beta value
+	if (beta <= 0) {
+		// Linear fit
+		cout << "Linear fit: " << endl;
+		linearFit(Doses, logS, alpha, error);
+		cout << "alpha = " << alpha << ", beta = 0" << endl;
+	} else {
+		// LQ fit
+		cout << "LQ fit: " << endl;
+		cout << "alpha = " << alpha << ", beta = " << beta << endl;
+	}
+	
+	// RBE10 calculation
+	double rbe10,dose10;
+	
+	// Dose at 10% calculation
+	double targetS = 0.1;
+	double Dose10 = calculateDose(alpha, beta, targetS);
+
+	if (Dose10 >= 0) {
+		cout << "Dose for S = " << targetS << " is: " << Dose10 << endl;
+	}
+	
+	rbe10 = (sqrt( (alphaX*alphaX) - (4*betaX*log(targetS)) ) - alphaX)/(2*betaX*Dose10);
+	
+	cout << "RBE10 with GSM2 = " << rbe10 << endl;
+	
+	Write_yD_RBE10("yDvsRBE10.csv", yD, Dose10, rbe10);
+	
+	///////////////////////////////////////////////////////
+	
 	WriteGSM2Survival("GSM2.csv", Doses, S, S_var, RBE, RBE_var);
 
 	if(fGetParticleContribution)
@@ -921,7 +962,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 	}
 	std::cout<<"Default parameters:"<<endl;
 	std::cout<<"1.The reference radiation is X-ray(200 kVp) with alpha = 0.19 Gy-1 and beta = 0.05 Gy-2"<<std::endl;
-	std::cout<<"2.THe bilogical end point is 10% survival of he human salivary gland (HSG) tumor cells."<<std::endl;
+	std::cout<<"2.THe biological end point is 10% survival of the human salivary gland (HSG) tumor cells."<<std::endl;
 	std::cout<<"Parameter used in this calculation:"     <<std::endl;
 	// std::cout<<"alpha0="<<MKModel_alpha0<<" Gy-1; "<<"beta="<<MKModel_beta<<" Gy-2; "
 	//         <<"rd="<<MKModel_rd<<" um; "<< "Rn="<< MKModel_Rn <<" um; "<<"y0="<<MKModel_y0<<" keV/um; "
@@ -959,11 +1000,11 @@ void TsGetSurvivalRBEQualityFactor::WriteGSM2Survival(string filename, std::vect
 	output << "# GSM2 Parameters\n#\n";
 	output << "# kappa = " << GSM2_kappa << " Gy-1\n"
 		<< "# lambda = " << GSM2_lambda << " Gy-1\n"
-		<< "# a = " << GSM2_a << "??\n"
-		<< "# b = " << GSM2_b << "??\n"
-		<< "# r = " << GSM2_r << "??\n"
+		<< "# a = " << GSM2_a << " \n"
+		<< "# b = " << GSM2_b << " \n"
+		<< "# r = " << GSM2_r << " \n"
 		<< "# AlphaX = " << GSM2_alphaX << " Gy-1 Reference radiation\n"
-		<< "# BetaX = " << GSM2_betaX << "Gy-2 Reference radiation\n"
+		<< "# BetaX = " << GSM2_betaX << " Gy-2 Reference radiation\n"
 		<< "# Domain Radius = " << GSM2_rd << " um\n"
 		<< "# Nucleus Radius = " << GSM2_Rn << " um\n"
 		<< "#\n";
@@ -1002,7 +1043,7 @@ void TsGetSurvivalRBEQualityFactor::WriteSurvivivalRBEParticleContribution(strin
 void TsGetSurvivalRBEQualityFactor::WriteQParticleContribution(string filename, std::vector<double> Vector_Particle)
 {
 
-	cout <<"MERDA"<< endl;
+	cout <<"NOT GOOD"<< endl;
 	std::ofstream outputParticle(filename);
 
 	outputParticle << "e-       Hprim    Hsec    He      Li      Be      B        C       Other    Total[Q]\n"; 
@@ -1012,4 +1053,143 @@ void TsGetSurvivalRBEQualityFactor::WriteQParticleContribution(string filename, 
 	outputParticle << std::endl;
 
 	outputParticle.close();
+}
+
+
+// TO DO: LQ/linear fit functions
+// Natural logarithm and minus sign
+vector<double> TsGetSurvivalRBEQualityFactor::logTransform(const vector<double>& S) {
+    vector<double> logS(S.size());
+    for (size_t i = 0; i < S.size(); ++i) {
+        logS[i] = -log(S[i]);
+    }
+    return logS;
+}
+
+// LQ fitting
+void TsGetSurvivalRBEQualityFactor::quadraticFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& beta, double& error) {
+    int n = doses.size();
+    double sumX = 0, sumY = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0, sumXY = 0, sumX2Y = 0;
+
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        sumX += x;
+        sumY += y;
+        sumX2 += x * x;
+        sumX3 += x * x * x;
+        sumX4 += x * x * x * x;
+        sumXY += x * y;
+        sumX2Y += x * x * y;
+    }
+
+    double D = n * (sumX2 * sumX4 - sumX3 * sumX3) - sumX * (sumX * sumX4 - sumX3 * sumX2) + sumX2 * (sumX * sumX3 - sumX2 * sumX2);
+    double D_alpha = n * (sumXY * sumX4 - sumX3 * sumX2Y) - sumY * (sumX * sumX4 - sumX3 * sumX2) + sumX2 * (sumX * sumX2Y - sumXY * sumX2);
+    double D_beta = n * (sumX2 * sumX2Y - sumXY * sumX3) - sumX * (sumX * sumX2Y - sumXY * sumX2) + sumY * (sumX * sumX3 - sumX2 * sumX2);
+
+    alpha = D_alpha / D;
+    beta = D_beta / D;
+    
+    // Calculate the residual sum of squares (RSS)
+    double rss = 0;
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        double y_fit = alpha * x + beta * x * x;
+        rss += (y - y_fit) * (y - y_fit);
+    }
+    error = rss;
+}
+
+
+// Linear fitting
+void TsGetSurvivalRBEQualityFactor::linearFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& error) {
+    int n = doses.size();
+    double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumX2 += x * x;
+    }
+
+    alpha = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    
+    // Calculate the residual sum of squares (RSS)
+    double rss = 0;
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        double y_fit = alpha * x;
+        rss += (y - y_fit) * (y - y_fit);
+    }
+    error = rss;
+}
+
+// Calculate Dose give target survival probability
+double TsGetSurvivalRBEQualityFactor::calculateDose(double alpha, double beta, double targetS) {
+    double targetLogS = -log(targetS);
+
+    if (beta == 0) {
+        // Linear equation: targetLogS = alpha * dose
+        return (targetLogS) / alpha;
+    } else {
+        // Quadratic equation: targetLogS = alpha * dose + beta * dose^2
+        double a = beta;
+        double b = alpha;
+        double c = - targetLogS;
+        
+        double discriminant = b * b - 4 * a * c;
+        if (discriminant < 0) {
+            cerr << "No real solution" << endl;
+            return -1;
+        }
+
+        double dose1 = (-b + sqrt(discriminant)) / (2 * a);
+        double dose2 = (-b - sqrt(discriminant)) / (2 * a);
+
+        // Return Dose
+        if (dose1 >= 0 && dose2 >= 0) {
+            return min(dose1, dose2);
+        } else if (dose1 >= 0) {
+            return dose1;
+        } else if (dose2 >= 0) {
+            return dose2;
+        } else {
+            cerr << "No real solution" << endl;
+            return -1;
+        }
+    }
+}
+
+void TsGetSurvivalRBEQualityFactor::Write_yD_RBE10(string filename, double yD, double Dose10, double RBE10)
+{
+	// Check if file exists
+	std::ifstream infile(filename);
+	bool exists = infile.good();
+	infile.close();
+	    
+	std::ofstream output(filename, std::ios::app); // Append mode
+	    
+	if (!exists) {
+		output << "# GSM2 Parameters\n#\n";
+		output << "# a = " << GSM2_a << " \n"
+		       << "# b = " << GSM2_b << " \n"
+		       << "# r = " << GSM2_r << " \n"
+		       << "# AlphaX = " << GSM2_alphaX << " Gy-1 Reference radiation\n"
+		       << "# BetaX = " << GSM2_betaX << " Gy-2 Reference radiation\n"
+		       << "# Domain Radius = " << GSM2_rd << " um\n"
+		       << "# Nucleus Radius = " << GSM2_Rn << " um\n"
+		       << "#\n";
+		output << "yD, Dose10, RBE10\n";
+	}
+	    
+	// Print values
+	output << std::fixed << std::setprecision(7) << yD << ",  " << Dose10 << ",  " << RBE10 << ",  ";
+	output << std::endl;
+
+	output.close();
 }

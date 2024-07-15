@@ -34,7 +34,7 @@ using namespace std;
 class TsGetSurvivalRBEQualityFactor 
 {
 	public:
-		TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<std::vector<double>> yVector_Partcile, double*BinLimit, double* hBinWidth, double* hfy, double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double>hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimesi, bool GetParticleContribution);
+		TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, double*BinLimit, double* hBinWidth, double* hfy, double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double>hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimesi, bool GetParticleContribution);
 		~TsGetSurvivalRBEQualityFactor();
 
 		void GetSurvWithMKModel_SaturationCorr();
@@ -53,6 +53,13 @@ class TsGetSurvivalRBEQualityFactor
 		void WriteGSM2Survival(string filename, std::vector<double> D, std::vector<double> S, std::vector<double> Svar, std::vector<double> RBE, std::vector<double> RBEvar);
 		void WriteSurvivivalRBEParticleContribution(string filename, std::vector<double> D, std::vector<std::vector<double>> Vector_Particle);
 		void WriteQParticleContribution(string filename, std::vector<double> Vector_Particle);
+		void Write_yD_RBE10(string filename, double yD, double Dose10, double RBE10);
+		
+		// TO DO: LQ/linear fit functions
+		vector<double> logTransform(const vector<double>& S);
+		void quadraticFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& beta, double& error);
+		void linearFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& error);
+		double calculateDose(double alpha, double beta, double targetS);
 
 		void SetDosesMacro(double* vec) 
 		{ 
@@ -93,8 +100,11 @@ class TsGetSurvivalRBEQualityFactor
 		int  fSpectrumUpdateTimes;
 		bool fGetParticleContribution;
 		int MCMultieventIterations;
+		std::vector<double> fyVector;
 		std::vector<std::vector<double>> fyVector_Particle;
                 std::vector<std::vector<double>> fyParticleContribution;
+                std::vector<double> fyVector_Nucleus;
+		std::vector<std::vector<double>> fyVector_Particle_Nucleus;
 		double* fBinLimit;
 		double* fBinWidth;
 		double* fhy;

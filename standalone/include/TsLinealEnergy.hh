@@ -38,7 +38,7 @@ using namespace std;
 class TsLinealEnergy 
 {
 	public:
-		TsLinealEnergy(std::vector<double> yVector, std::vector<std::vector<double>>);
+		TsLinealEnergy(std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle);
 		~TsLinealEnergy();
 	
 		void InitializeMicrodosimetricSpectrum();
@@ -53,6 +53,7 @@ class TsLinealEnergy
 		double GetyFvar() {return yF_var;};
 		double GetyDvar() {return yD_var;};
 		
+		std::vector<double> GetyF_Particle() {return yF_Particle;};
 		std::vector<double> GetfyVariance() {return fVariance;};
 		std::vector<double> Getfy() {return hfy;};
 		std::vector<double> Getyfy() {return hyfy;};
@@ -64,6 +65,8 @@ class TsLinealEnergy
 
 		std::vector<double> GetyBinWidth() {return BinWidth;};
 		std::vector<double> GetyBinLimit() {return BinLimit;};
+		
+		std::vector<double> GetProbabilityContribution() {return Probability_fy_Particle;};
 
 		std::vector<std::vector<double>> GetParticleContribution() {return yParticleContibution;};
 	private:
@@ -89,9 +92,10 @@ class TsLinealEnergy
 	std::vector<double>  dy_var,  dy_std;
 
 	//std::vector<std::vector<double>> hfy_particle;
+	std::vector<double> Probability_fy_Particle;
 	std::vector<std::vector<double>> yParticleContibution;
 	double **hfy_particle;
-	std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth;
+	std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth, yF_Particle;
 	
 
 };
