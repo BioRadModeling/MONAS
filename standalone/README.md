@@ -8,7 +8,7 @@ It takes as input the PhaseSpace produced by TOPAS microdosimetric extension whi
 - **main**: Main function for Survival and RBE
 	- **TsGetSurvival**: Class manager for computing MKM and GSM2 survival
 		- **TsGSM2**: Class with GSM2 functions
-			- **TsSpecificEnergy**: Class for sepcifi energy spectra calculation
+			- **TsSpecificEnergy**: Class for specific energy spectra calculation
 	- **TsLinealEnergy**: Class for microdosimetric spectra calculation
 
 ## COMPILE
@@ -33,6 +33,3 @@ Example GSM2 (parameters for H460 cells):
 ```
 ./monas -help
 ```
-
-
-GSM2 -fSetMultiEventStatistic 100000 -fGetParticleContribution -topasScorer_08 /home/user/Scrivania/Dottorato/SPECTRA/Spectra_helium/SPECTRA_08um/Scorer_1.phsp -topasScorer_8 /home/user/Scrivania/Dottorato/SPECTRA/Spectra_helium/SPECTRA_8um/Scorer_1.phsp -GSM2_rDomain 0.8 -GSM2_rNucleus 6 -GSM2_alphaX 0.29 -GSM2_betaX 0.083 -GSM2_a 0.000899  -GSM2_b 0.0642  -GSM2_r 2.71  -GSM2_kappa 0.0750 -GSM2_lambda 0.0000750 -Doses 0 10 1
