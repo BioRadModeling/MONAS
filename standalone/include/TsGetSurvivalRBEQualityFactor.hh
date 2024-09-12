@@ -59,6 +59,7 @@ class TsGetSurvivalRBEQualityFactor
 		vector<double> logTransform(const vector<double>& S);
 		void quadraticFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& beta, double& error);
 		void linearFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& error);
+		void linearFitDoseSquare(const vector<double>& doses, const vector<double>& logS, double& beta, double& error);
 		double calculateDose(double alpha, double beta, double targetS);
 
 		void SetDosesMacro(double* vec) 

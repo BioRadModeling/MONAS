@@ -917,7 +917,15 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		// Linear fit
 		cout << "Linear fit: " << endl;
 		linearFit(Doses, logS, alpha, error);
+		beta = 0;
 		cout << "alpha = " << alpha << ", beta = 0" << endl;
+	} else if (alpha < 0) {
+
+		cout << "Linear fit: " << endl;
+		linearFitDoseSquare(Doses, logS, beta, error);
+		alpha = 0;
+		cout << "alpha = 0" << ", beta " << beta << endl;
+
 	} else {
 		// LQ fit
 		cout << "LQ fit: " << endl;
@@ -1128,6 +1136,33 @@ void TsGetSurvivalRBEQualityFactor::linearFit(const vector<double>& doses, const
         double x = doses[i];
         double y = logS[i];
         double y_fit = alpha * x;
+        rss += (y - y_fit) * (y - y_fit);
+    }
+    error = rss;
+}
+
+// Linear fitting
+void TsGetSurvivalRBEQualityFactor::linearFitDoseSquare(const vector<double>& doses, const vector<double>& logS, double& beta, double& error) {
+    int n = doses.size();
+    double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        sumX += x * x;
+        sumY += y;
+        sumXY += x * x * y;
+        sumX2 += x * x * x * x;
+    }
+
+    beta = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    
+    // Calculate the residual sum of squares (RSS)
+    double rss = 0;
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        double y_fit = beta * x * x;
         rss += (y - y_fit) * (y - y_fit);
     }
     error = rss;
