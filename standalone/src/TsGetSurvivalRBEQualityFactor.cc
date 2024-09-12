@@ -931,11 +931,15 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 	double targetS = 0.1;
 	double Dose10 = calculateDose(alpha, beta, targetS);
 
+	double Dose10_X = calculateDose(alphaX, betaX, targetS);
+
 	if (Dose10 >= 0) {
 		cout << "Dose for S = " << targetS << " is: " << Dose10 << endl;
 	}
 	
-	rbe10 = (sqrt( (alphaX*alphaX) - (4*betaX*log(targetS)) ) - alphaX)/(2*betaX*Dose10);
+	// rbe10 = (sqrt( (alphaX*alphaX) - (4*betaX*log(targetS)) ) - alphaX)/(2*betaX*Dose10);
+
+	rbe10 = Dose10_X/Dose10;
 	
 	cout << "RBE10 with GSM2 = " << rbe10 << endl;
 	
