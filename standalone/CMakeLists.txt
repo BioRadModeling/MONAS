@@ -32,4 +32,9 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 add_executable (${PROJECT_NAME} monas.cc ${SOURCES})
 
+# GSL libraries
+find_package(GSL REQUIRED)
+include_directories(${GSL_INCLUDE_DIRS})
+target_link_libraries(monas ${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES})
+
 
