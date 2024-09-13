@@ -61,6 +61,7 @@ class TsGetSurvivalRBEQualityFactor
 		// Quadratic fit with GSL library
 		void fit_quadratic_GSL(const std::vector<double>& doses, const std::vector<double>& logS, double& alpha, double& beta, double& error);
 		void linearFit(const vector<double>& doses, const vector<double>& logS, double& alpha, double& error);
+		void linearFitDoseSquare(const vector<double>& doses, const vector<double>& logS, double& beta, double& error);
 		double calculateDose(double alpha, double beta, double targetS);
 
 		void SetDosesMacro(double* vec) 
