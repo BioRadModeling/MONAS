@@ -30,6 +30,9 @@
 #include <thread>
 #include <chrono>
 
+// GSL library
+#include <gsl/gsl_multifit.h>
+
 using namespace std;
 
 TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
@@ -907,10 +910,16 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 
 	// LQ Fit
 	double alpha, beta, error;
-	quadraticFit(Doses, logS, alpha, beta, error);
+	alpha=0;
+	beta=0;
+	
+	// Directly solving the equation
+	// quadraticFit(Doses, logS, alpha, beta, error);
+	
+	// Implementation with GSL library
+	fit_quadratic_GSL(Doses, logS, alpha, beta, error);
+	
 	cout << "Error LQ fit: " << error << endl;
-	linearFit(Doses, logS, alpha, error);
-	cout << "Error linear fit: " << error << endl;
 
 	// Check of beta value
 	if (beta <= 0) {
@@ -918,6 +927,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		cout << "Linear fit: " << endl;
 		linearFit(Doses, logS, alpha, error);
 		cout << "alpha = " << alpha << ", beta = 0" << endl;
+		cout << "Error linear fit: " << error << endl;
 	} else {
 		// LQ fit
 		cout << "LQ fit: " << endl;
@@ -1192,4 +1202,42 @@ void TsGetSurvivalRBEQualityFactor::Write_yD_RBE10(string filename, double yD, d
 	output << std::endl;
 
 	output.close();
+}
+
+
+void TsGetSurvivalRBEQualityFactor::fit_quadratic_GSL(const std::vector<double>& doses, const std::vector<double>& logS, double& alpha, double& beta, double& error) {
+    const size_t n = doses.size(); // Ricaviamo la dimensione automaticamente
+    const size_t p = 2; // Numero di parametri nel fit (x, x^2)
+
+    // Matrice di design X e vettore di osservazione Y
+    gsl_matrix *X = gsl_matrix_alloc(n, p);
+    gsl_vector *Y = gsl_vector_alloc(n);
+
+    // Riempimento della matrice X con i termini x e x^2
+    for (size_t i = 0; i < n; ++i) {
+        gsl_matrix_set(X, i, 0, doses[i]);              // Primo termine: x (doses)
+        gsl_matrix_set(X, i, 1, doses[i] * doses[i]);   // Secondo termine: x^2 (doses^2)
+        gsl_vector_set(Y, i, logS[i]);                  // Valori osservati y (logS)
+    }
+
+    // Vettori per i coefficienti del fit (a, b)
+    gsl_vector *c = gsl_vector_alloc(p);
+    gsl_matrix *cov = gsl_matrix_alloc(p, p); // Matrice di covarianza
+    gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(n, p);
+
+    // Eseguire il fit lineare
+    double chisq;
+    gsl_multifit_linear(X, Y, c, cov, &chisq, work);
+
+    // Salvare i coefficienti nei riferimenti passati
+    alpha = gsl_vector_get(c, 0); // Coefficiente a (termine x)
+    beta = gsl_vector_get(c, 1);  // Coefficiente b (termine x^2)
+    error = chisq;                // Salvataggio chi-squared
+
+    // Liberare la memoria
+    gsl_matrix_free(X);
+    gsl_vector_free(Y);
+    gsl_vector_free(c);
+    gsl_matrix_free(cov);
+    gsl_multifit_linear_free(work);
 }
