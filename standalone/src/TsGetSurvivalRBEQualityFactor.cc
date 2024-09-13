@@ -926,6 +926,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		// Linear fit
 		cout << "Linear fit: " << endl;
 		linearFit(Doses, logS, alpha, error);
+		beta = 0;
 		cout << "alpha = " << alpha << ", beta = 0" << endl;
 		cout << "Error linear fit: " << error << endl;
 	} else {
@@ -941,11 +942,15 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 	double targetS = 0.1;
 	double Dose10 = calculateDose(alpha, beta, targetS);
 
+	double Dose10_X = calculateDose(alphaX, betaX, targetS);
+
 	if (Dose10 >= 0) {
 		cout << "Dose for S = " << targetS << " is: " << Dose10 << endl;
 	}
 	
-	rbe10 = (sqrt( (alphaX*alphaX) - (4*betaX*log(targetS)) ) - alphaX)/(2*betaX*Dose10);
+	// rbe10 = (sqrt( (alphaX*alphaX) - (4*betaX*log(targetS)) ) - alphaX)/(2*betaX*Dose10);
+
+	rbe10 = Dose10_X/Dose10;
 	
 	cout << "RBE10 with GSM2 = " << rbe10 << endl;
 	
@@ -1134,6 +1139,33 @@ void TsGetSurvivalRBEQualityFactor::linearFit(const vector<double>& doses, const
         double x = doses[i];
         double y = logS[i];
         double y_fit = alpha * x;
+        rss += (y - y_fit) * (y - y_fit);
+    }
+    error = rss;
+}
+
+// Linear fitting
+void TsGetSurvivalRBEQualityFactor::linearFitDoseSquare(const vector<double>& doses, const vector<double>& logS, double& beta, double& error) {
+    int n = doses.size();
+    double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        sumX += x * x;
+        sumY += y;
+        sumXY += x * x * y;
+        sumX2 += x * x * x * x;
+    }
+
+    beta = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    
+    // Calculate the residual sum of squares (RSS)
+    double rss = 0;
+    for (int i = 0; i < n; ++i) {
+        double x = doses[i];
+        double y = logS[i];
+        double y_fit = beta * x * x;
         rss += (y - y_fit) * (y - y_fit);
     }
     error = rss;
