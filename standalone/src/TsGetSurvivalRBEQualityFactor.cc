@@ -1,5 +1,5 @@
 // *************************************************************************
-// * MONAS is a C++ package that calculates cell surviavl curvs and        *
+// * MONAS is a C++ package that calculates cell survival curves and        *
 // * dose dependednt RBE from microdosimetric spectra.			   *
 // *									   *
 // * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@miami.edu>	   *
