@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 	////////////////////////////////////////////////////////////
 	bool fGetStatitisticInfo = false;
 	int fSpectrumUpdateTimes = 100;
-	int fSetMultiEventStatistic = 1e4;
+	int fSetMultiEventStatistic = 100000;
 	bool fGetParticleContribution = false;
 	//Initialize Microdosimetric variables
 	double yF=0., yD=0.;
@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
 	//Macroscopic Doses
 	vector<double> Doses = {0,10,0.5}; //Unit:Gy
 	bool MKMSatCorrFlag = 0, MKMnonPoissFlag = 0, SMKMFlag = 0, DSMKMFlag = 0, GSM2Flag = 0, RBEWeightingFlag = 0, QfICRUFlag = 0, QfKellFlag = 0;
+	bool H460Flag = 0, H1437Flag = 0;
 	/////////////////////////////////////////////////////////////
 	//
 	// READ INPUT PARAMETERS
@@ -104,6 +105,10 @@ int main(int argc, char *argv[])
 		if(strcmp(argv[i],"-MKM_ac") == 0) {MKModel_ac = stod(argv[i+1]);}
 		if(strcmp(argv[i],"-MKM_tr") == 0) {MKModel_tr= stod(argv[i+1]);}
 
+		// PARAMETERS FROM CELL LINE FLAG (TO ADD, ALSO SAME alphaX, betaX FOR BOTH GSM2 AND MKM)
+		if(strcmp(argv[i],"-H460") == 0) {H460Flag = 1;}
+		if(strcmp(argv[i],"-H1437") == 0) {H1437Flag = 1;}
+		
 		if(strcmp(argv[i],"-GSM2_rDomain") == 0) {GSM2_rd = stod(argv[i+1]);}
 		if(strcmp(argv[i],"-GSM2_rNucleus") == 0) {GSM2_Rn = stod(argv[i+1]);}
 		if(strcmp(argv[i],"-GSM2_kappa") == 0) {GSM2_kappa = stod(argv[i+1]);}
@@ -141,14 +146,42 @@ int main(int argc, char *argv[])
 		{
 			cout 	<<"-Rd: Domain radius [um]" <<endl
 				<<"-Rc: Cell Nucleus radius [um]" <<endl
-				<<"-k -l: GSM2 paramters" <<endl
-				<<"-a -b -r: kinetic Parameters" <<endl
+				<<"-CellLine: replace with cell line name (-H460 or -H1437)" <<endl
 				<<"-topasScorer: path/file.phsp with y values" <<endl
-				<<"-help: list of inputs" <<endl;
+				<<"-Doses: (initial dose value) (final dose value) (step value)" <<endl
+				<<"-help: list of definitions and inputs" <<endl;
 			return 0;			     
 		}
 	}
-
+	
+	// Parameters for each cell line (H460, H1437)
+	if(H460Flag)
+	{
+		cout 	<<"\nH460 CELL LINE IS SELECTED \n" <<endl;
+		GSM2_alphaX = 0.29;
+		GSM2_betaX = 0.083;
+		MKModel_alphaX = 0.29;
+		MKModel_betaX = 0.083;
+		GSM2_rd = 0.8;
+		GSM2_Rn = 6;
+		GSM2_a = 0.000899;
+		GSM2_b = 0.0642;
+		GSM2_r = 2.71;
+	}else if(H1437Flag){
+		cout 	<<"\nH1437 CELL LINE IS SELECTED \n" <<endl;
+		GSM2_alphaX = 0.05;
+		GSM2_betaX = 0.041;
+		MKModel_alphaX = 0.05;
+		MKModel_betaX = 0.041;
+		GSM2_rd = 0.6;
+		GSM2_Rn = 8;
+		GSM2_a = 0.0148;
+		GSM2_b = 0.0149;
+		GSM2_r = 2.70;
+	}else{
+		// Default values
+		cout 	<<"\nNO SPECIFIC CELL LINE IS SELECTED (USING DEFAULT VALUES) \n" <<endl;
+	}
 
 	/////////////////////////////////////////////////////////////
 	//
