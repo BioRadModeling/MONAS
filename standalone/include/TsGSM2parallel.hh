@@ -45,11 +45,24 @@ using namespace std;
 class TsGSM2 
 {
 	public:
-		TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, bool GetStatisticInfo, int SpectrumUpdateTimes);
+		TsGSM2(double yF, 
+			double Rd, 
+			double Rc, 
+			double kinA, 
+			double kinB, 
+			double kinR,
+			const string& ion,
+			double LET, 
+			std::vector<double> yVector, 
+			std::vector<std::vector<double>> yVector_Particle, 
+			std::vector<double> yVector_Nucleus, 
+			std::vector<std::vector<double>> yVector_Particle_Nucleus, 
+			bool GetStatisticInfo, 
+			int SpectrumUpdateTimes);
 		~TsGSM2();
 
 		//input solo parametri biologici
-		double CalculateKappaFromSpectra(); // New Kappa formulation
+		double CalculateKappaFromLET(const string& ion, double LET); // New Kappa formulation
 		void InitializeHistograms(int bins, double start, double end);
 		void SetSpecificEnergySpectraCellNucleus();
 		void ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vector<double> &p0xy, double zn, int NumberOfSamples);
@@ -122,6 +135,8 @@ class TsGSM2
 		double **hfy_particle;
 		std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth;
 		
+		const string& GSM2_ion = "H";
+		const double GSM2_LET = 10.0; // keV/um
 		
 		TsLinealEnergy* ySpectra_F;
 };

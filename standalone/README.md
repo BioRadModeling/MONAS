@@ -11,6 +11,9 @@ It takes as input the PhaseSpace produced by TOPAS microdosimetric extension whi
 			- **TsSpecificEnergy**: Class for specific energy spectra calculation
 	- **TsLinealEnergy**: Class for microdosimetric spectra calculation
 
+## LIBRARIES NEEDED
+- GSL (Ubuntu): ```sudo apt-get install libgsl-dev```
+
 ## COMPILE
 ```
 cmake .

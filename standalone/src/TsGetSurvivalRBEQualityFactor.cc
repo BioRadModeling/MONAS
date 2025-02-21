@@ -68,11 +68,13 @@ TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::ve
 	GSM2_r 		= 0.1;
 	GSM2_alphaX 	= 0.19;
 	GSM2_betaX 	= 0.05;
+	GSM2_ion 	= "H";
+	GSM2_LET 	= 10.0; //keV/um
 	//Macroscopic Doses
 	Doses = {0,1,2,3,4,5,6,7,8,9,10}; //Unit:Gy
 
 	//MultiEventIterations
-	MCMultieventIterations = 1e4;
+	MCMultieventIterations = 1e5;
 	BioWeightFunctionDataFile = "BioWeightFuncData_interpolation.txt";
 
 };
@@ -786,7 +788,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 
 	double alphaX = GSM2_alphaX;
 	double betaX = GSM2_betaX;
-	TsGSM2* aGSM2 = new TsGSM2(yF,  GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, fyVector, fyVector_Particle, fyVector_Nucleus, fyVector_Particle_Nucleus, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	TsGSM2* aGSM2 = new TsGSM2(yF,  GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_ion, GSM2_LET, fyVector, fyVector_Particle, fyVector_Nucleus, fyVector_Particle_Nucleus, fGetStatitisticInfo, fSpectrumUpdateTimes);
 	cout << MCMultieventIterations << endl;
 	vector<double> zBinCenter = aGSM2->GetZn();
 	vector<double> zBinWidth = aGSM2->GetzBinWidth();

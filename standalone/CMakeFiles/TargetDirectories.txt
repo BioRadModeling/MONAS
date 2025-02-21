@@ -1,0 +1,3 @@
+/home/giorgio/MONAS/standalone/CMakeFiles/rebuild_cache.dir
+/home/giorgio/MONAS/standalone/CMakeFiles/edit_cache.dir
+/home/giorgio/MONAS/standalone/CMakeFiles/monas.dir
