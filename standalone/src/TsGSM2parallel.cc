@@ -27,6 +27,7 @@
 #include "TsSpecificEnergy.hh"
 #include "TsLinealEnergy.hh"
 
+#include <unordered_map>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -45,7 +46,7 @@
 
 using namespace std;
 
-TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, const string& GSM2_ion, double GSM2_LET,
+TsGSM2::TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, string GSM2_ion, double GSM2_LET,
 	std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, bool GetStatisticInfo, int SpectrumUpdateTimes)
 	:GSM2Model_yF(yF), GSM2Model_rd(Rd), GSM2Model_rc(Rc), GSM2_a(kinA), GSM2_b(kinB), GSM2_r(kinR), GSM2_ion(GSM2_ion), GSM2_LET(GSM2_LET),
 	fyVector(yVector), fyVector_Particle(yVector_Particle), fyVector_Nucleus(yVector_Nucleus), fyVector_Particle_Nucleus(yVector_Particle_Nucleus), fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes)
@@ -97,7 +98,7 @@ TsGSM2::~TsGSM2()
 {};
 
 // New method for Kappa
-double TsGSM2::CalculateKappaFromLET(const string& ion, double LET)
+double TsGSM2::CalculateKappaFromLET(string ion, double LET)
 {	
 	// New formulation of Kappa and Lambda from PARTRAC simulations on DSBsites (Kundrát, Baiocco et al.)	
 	// "Total DSBsites yield" parameters (e-,H,H_sec,He,Li,Be,B,C,others)
@@ -120,9 +121,9 @@ double TsGSM2::CalculateKappaFromLET(const string& ion, double LET)
 	int ii = ion_index[ion];
 	
 	if (ion == "H") {
-		return 9 * (p1[ii] + pow(p2[ii] * energy_list_ion, p3[ii]));
+		return 9 * (p1[ii] + pow(p2[ii] * LET, p3[ii]));
 	} else {
-		return 9 * (p1[ii] + pow(p2[ii] * energy_list_ion, p3[ii])) / (1 + pow(p4[ii] * energy_list_ion, p5[ii]));
+		return 9 * (p1[ii] + pow(p2[ii] * LET, p3[ii])) / (1 + pow(p4[ii] * LET, p5[ii]));
 	}
 	
 }
