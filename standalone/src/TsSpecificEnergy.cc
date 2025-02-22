@@ -2,7 +2,7 @@
 // * MONAS is a C++ package that calculates cell surviavl curvs and        *
 // * dose dependednt RBE from microdosimetric spectra.			   *
 // *									   *
-// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@miami.edu>	   *
+// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@maastro.nl>	   *
 // * 									   *
 // * This program is free software: you can redistribute it and/or modify  *
 // * it under the terms of the GNU General Public License as published by  *
@@ -18,10 +18,6 @@
 // * along with this program.  If not, see <http://www.gnu.org/licenses/>. *
 // **************************************************************************
 // Extra Class for TsYScorer
-
-// Claculate RBE 
-// Author: Hongyu Zhu
-// Date: 04/19/2019
 
 #include "TsSpecificEnergy.hh"
 
