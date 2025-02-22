@@ -2,7 +2,7 @@
 // * MONAS is a C++ package that calculates cell surviavl curvs and        *
 // * dose dependednt RBE from microdosimetric spectra.			   *
 // *									   *
-// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@miami.edu>	   *
+// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@maastro.nl>	   *
 // * 									   *
 // * This program is free software: you can redistribute it and/or modify  *
 // * it under the terms of the GNU General Public License as published by  *
@@ -19,9 +19,6 @@
 // **************************************************************************
 // Extra Class for TsYScorer
 
-// Claculate RBE 
-// Author: Hongyu Zhu
-// Date: 04/19/2019
 
 #include "TsLinealEnergy.hh"
 
@@ -44,7 +41,7 @@ TsLinealEnergy::TsLinealEnergy(std::vector<double> yVector, std::vector<std::vec
 	// calculate statistic information
 	InitializeStatistic();
 	//GetSpectrum();
-	cout <<"Start statistic error calcuation ..."<<endl;
+	cout <<"-> TSLinealEnergyCalled<-\nStart statistic error calcuation ..."<<endl;
 	clock_t start,end;
 	start = clock();
 	if (fSpectrumUpdateTimes>fyVector.size()){
@@ -133,8 +130,6 @@ void TsLinealEnergy::InitializeStatistic()
 
 void TsLinealEnergy::GetSpectrum()
 {
-	cout<<"yVector size = "<<fyVector.size()<< endl;
-	cout<<"yVector_Particle size = " << fyVector_Particle.size()<< endl;
 	int nnum=0;
 	int index=0;
 	for (std::vector<double>::const_iterator i = fyVector.begin(); i != fyVector.end(); ++i){
@@ -187,13 +182,11 @@ void TsLinealEnergy::GetSpectrum()
 			yF_Particle[particle] += hyfy[i]*BinWidth[i]*yParticleContibution[i][particle]; 
 		}   
 	}
-	std::cout<<yF_Particle[9]<<endl;  // DEBUGGING 
 	
 	yF=0;
 	for (int i=0;i<yBinNum;i++){
 		yF = yF + hyfy[i]*BinWidth[i];          // multiply by bin width
 	}
-	std::cout<<yF<<endl;  // DEBUGGING 
 
 	for (int i=0;i<yBinNum;i++){
 		hdy[i] = hyfy[i]/yF;                                    //calculate d(y) = y*f(y)/yF (cf. Burigo et al., NIMB 320 (2014))
@@ -206,7 +199,6 @@ void TsLinealEnergy::GetSpectrum()
 		for (int i=0;i<yBinNum;i++){
 			Probability_fy_Particle[particle] += hfy[i]*BinWidth[i]*yParticleContibution[i][particle]; 
 		}   
-		std::cout<<Probability_fy_Particle[particle]<<endl;  // DEBUGGING 
 	}
 
 	//******************************************************************

@@ -2,7 +2,7 @@
 // * MONAS is a C++ package that calculates cell surviavl curvs and        *
 // * dose dependednt RBE from microdosimetric spectra.			   *
 // *									   *
-// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@miami.edu>	   *
+// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@maastro.nl>	   *
 // * 									   *
 // * This program is free software: you can redistribute it and/or modify  *
 // * it under the terms of the GNU General Public License as published by  *
@@ -34,6 +34,10 @@ using namespace std;
 int main(int argc, char *argv[])
 {
 
+	/////////////////////////////////////////////////////////////	
+	// TIME VARIABLES	////////////////////////////////////////
+	/////////////////////////////////////////////////////////////
+	auto start = std::chrono::high_resolution_clock::now();
 	/////////////////////////////////////////////////////////////
 	//
 	// INITIALIZE VARIABLES
@@ -77,9 +81,11 @@ int main(int argc, char *argv[])
 	double GSM2_r          = 0.1;
 	double GSM2_alphaX 	= 0.19;
 	double GSM2_betaX 	= 0.05;
+	string GSM2_ion        = "H";
+	double GSM2_LET        = 10.0; //keV/um
 	//Macroscopic Doses
 	vector<double> Doses = {0,10,0.5}; //Unit:Gy
-	bool MKMSatCorrFlag = 0, MKMnonPoissFlag = 0, SMKMFlag = 0, DSMKMFlag = 0, GSM2Flag = 0, RBEWeightingFlag = 0, QfICRUFlag = 0, QfKellFlag = 0;
+	bool MKMSatCorrFlag = 0, MKMnonPoissFlag = 0, SMKMFlag = 0, DSMKMFlag = 0, GSM2Flag = 0, RBEWeightingFlag = 0, QfICRUFlag = 0, QfKellFlag = 0, UseTwoSpecraFlag =0;
 	bool H460Flag = 0, H1437Flag = 0;
 	/////////////////////////////////////////////////////////////
 	//
@@ -87,8 +93,8 @@ int main(int argc, char *argv[])
 	//
 	////////////////////////////////////////////////////////////
 
-	string TopasScorerFile;
-	string TopasScorerFile_Nucleus; // new line
+	string TopasScorerFileDomain;
+	string TopasScorerFileNucleus; // new line
 	string BioWeightFunctionDataFile = "BioWeightFuncData_interpolation.txt";
 	//Loop on inputs
 	for(int i=0; i<argc; i++)
@@ -117,6 +123,8 @@ int main(int argc, char *argv[])
 		if(strcmp(argv[i],"-GSM2_r") == 0) {GSM2_r = stod(argv[i+1]);}
 		if(strcmp(argv[i],"-GSM2_alphaX") == 0) {GSM2_alphaX = stod(argv[i+1]);}
 		if(strcmp(argv[i],"-GSM2_betaX") == 0) {GSM2_betaX = stod(argv[i+1]);}		
+		if(strcmp(argv[i],"-GSM2_ion") == 0) {GSM2_ion = argv[i+1];}
+		if(strcmp(argv[i],"-GSM2_LET") == 0) {GSM2_LET = stod(argv[i+1]);}
 
 		if(strcmp(argv[i],"-MKMSatCorr") == 0) {MKMSatCorrFlag = 1;}
 		if(strcmp(argv[i],"-MKMnonPoiss") == 0) {MKMnonPoissFlag = 1;}
@@ -140,8 +148,12 @@ int main(int argc, char *argv[])
 			Doses = {stod(argv[i+1]), stod(argv[i+2]), stod(argv[i+3])};
 		}
 
-		if(strcmp(argv[i],"-topasScorer_08") == 0) {TopasScorerFile = argv[i+1];} //input file
-		if(strcmp(argv[i],"-topasScorer_8") == 0) {TopasScorerFile_Nucleus = argv[i+1];} //input file // new line
+		if(strcmp(argv[i],"-topasScorerDomain") == 0) {TopasScorerFileDomain = argv[i+1];} //input file
+		if(strcmp(argv[i],"-topasScorerNucleus") == 0) 
+		{
+			UseTwoSpecraFlag = true;
+			TopasScorerFileNucleus = argv[i+1];
+		} //input file // new line
 		if(strcmp(argv[i],"-help") == 0) 
 		{
 			cout 	<<"-Rd: Domain radius [um]" <<endl
@@ -180,22 +192,22 @@ int main(int argc, char *argv[])
 		GSM2_r = 2.70;
 	}else{
 		// Default values
-		cout 	<<"\nNO SPECIFIC CELL LINE IS SELECTED (USING DEFAULT VALUES) \n" <<endl;
+		cout << "\033[1;33m\nWARNING: NO SPECIFIC CELL LINE IS SELECTED (USING DEFAULT VALUES)\033[0m\n" << endl;
 	}
 
 	/////////////////////////////////////////////////////////////
 	//
-	// READ TOPAS SCORER
+	// READ TOPAS SCORER DOMAIN: MANDATORY!!!
 	//
 	////////////////////////////////////////////////////////////
 
 	vector<vector<double>> yVector_Particle;
 	vector<double>  yVector;
 
-    	ifstream infile(&TopasScorerFile[0]);
-	if(infile.fail()) // checks to see if file opended 
+	ifstream infile(&TopasScorerFileDomain[0]);
+	if(!infile) // checks to see if file opened
 	{
-		cout << "ERROR::" <<TopasScorerFile <<" NOT FOUND!!!" << endl;
+		cout << "\033[1;31mERROR:: INPUT FILE (DOMAIN) " << TopasScorerFileNucleus << " NOT FOUND!!!\033[0m" << endl;
 		return -1; // no point continuing if the file didn't open...
 	}
 	while(!infile.eof()) // reads file to end of *file*, not line
@@ -203,18 +215,19 @@ int main(int argc, char *argv[])
 
 		double y_total, y_z0, y_z1_prim, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
 		//double y_total, y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
-		infile >> y_total 
-			>> y_z0
-			>> y_z1_prim
-			//>> y_z1_seco
-			>> y_z2
-			>> y_z3
-			>> y_z4
-			>> y_z5
-			>> y_z6
-			>> y_z_;
+		infile >> y_total ;
+			// >> y_z0
+			// >> y_z1_prim
+			// >> y_z1_seco
+			// >> y_z2
+			// >> y_z3
+			// >> y_z4
+			// >> y_z5
+			// >> y_z6
+			// >> y_z_;
 
-		vector<double> yParticle {y_z0, y_z1_prim, 0, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+		// vector<double> yParticle {y_z0, y_z1_prim, 0, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+		vector<double> yParticle {0, 0, 0, 0, 0, 0, 0, 0, 0, y_total};
 		
 		//vector<double> yParticle {y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
 		
@@ -233,36 +246,47 @@ int main(int argc, char *argv[])
 	vector<vector<double>> yVector_Particle_Nucleus;
 	vector<double>  yVector_Nucleus;
 
-    	ifstream infile_Nucleus(&TopasScorerFile_Nucleus[0]);
-	if(infile_Nucleus.fail()) // checks to see if file opended 
+	if (UseTwoSpecraFlag)  // if the second spectrum is given use this
 	{
-		cout << "ERROR::" <<TopasScorerFile_Nucleus <<" NOT FOUND!!!" << endl;
-		return -1; // no point continuing if the file didn't open...
-	}
-	while(!infile_Nucleus.eof()) // reads file to end of *file*, not line
-	{ 
+		ifstream infile_Nucleus(&TopasScorerFileNucleus[0]);
+		if(!infile_Nucleus) // checks to see if file opended 
+		{
+			cout << "\033[1;31mERROR:: INPUT FILE (NUCLEUS) " << TopasScorerFileNucleus << " NOT FOUND!!!\033[0m" << endl;
+			return -1; // no point continuing if the file didn't open...
+		}
+		while(!infile_Nucleus.eof()) // reads file to end of *file*, not line
+		{ 
 
-		double y_total, y_z0, y_z1_prim, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
-		//double y_total, y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
-		infile_Nucleus >> y_total 
-			>> y_z0
-			>> y_z1_prim
-			//>> y_z1_seco
-			>> y_z2
-			>> y_z3
-			>> y_z4
-			>> y_z5
-			>> y_z6
-			>> y_z_;
+			double y_total, y_z0, y_z1_prim, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
+			//double y_total, y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_;
+			infile_Nucleus >> y_total 
+				>> y_z0
+				>> y_z1_prim
+				//>> y_z1_seco
+				>> y_z2
+				>> y_z3
+				>> y_z4
+				>> y_z5
+				>> y_z6
+				>> y_z_;
 
-		vector<double> yParticle {y_z0, y_z1_prim, 0, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
-		
-		//vector<double> yParticle {y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
-		
-		yVector_Particle_Nucleus.push_back(yParticle);
-		yVector_Nucleus.push_back(y_total);  
+			vector<double> yParticle {y_z0, y_z1_prim, 0, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+
+			//vector<double> yParticle {y_z0, y_z1_prim, y_z1_seco, y_z2, y_z3, y_z4, y_z5, y_z6, y_z_, y_total};
+
+			yVector_Particle_Nucleus.push_back(yParticle);
+			yVector_Nucleus.push_back(y_total);  
+		}
+		infile_Nucleus.close();
+	} 
+	else // use the domain one and it will be rescaled afterwords
+	{
+		yVector_Particle_Nucleus = yVector_Particle;
+		yVector_Nucleus = yVector;
+		cout << "\033[1;33mWARNING: Using domain spectrum for nucleus calculations. Results may not be accurate.\033[0m" << endl;
 	}
-	infile_Nucleus.close();
+    
+	auto stop_input = std::chrono::high_resolution_clock::now();
 
 
 	/////////////////////////////////////////////////////////////
@@ -284,9 +308,9 @@ int main(int argc, char *argv[])
 	yF_var = aLinealEnergy -> GetyFvar();
 	yD_var = aLinealEnergy -> GetyDvar();
 	int yBinNum = BinWidth.size();
-	std::cout<<"Parameters:\n";
-	std::cout<<"yF: " <<yF << "-+ " <<sqrt(yF_var) <<endl
-		<<"yD: " << yD << "-+ " <<sqrt(yD_var) << endl;
+	std::cout << "\033[1;32mINPUT DOMAIN SPECTRUM PARAMETERS:\033[0m\n";
+	std::cout << "\033[1;32m" << "yF: " << yF << " -+ " << sqrt(yF_var) << "\033[0m" << endl
+			  << "\033[1;32m" << "yD: " << yD << " -+ " << sqrt(yD_var) << "\033[0m" << endl;
 
 	vector<vector<double>> contribution = aLinealEnergy -> GetParticleContribution();
 	hydy = aLinealEnergy->Getydy();
@@ -328,6 +352,8 @@ int main(int argc, char *argv[])
 	}
 	*/
 	
+	auto GSM2_time = std::chrono::seconds(0);
+
 	if(MKMSatCorrFlag)
 		aSurvRBEQf->GetSurvWithMKModel_SaturationCorr();
 	if(MKMnonPoissFlag)
@@ -350,6 +376,7 @@ int main(int argc, char *argv[])
 	//aSurvRBEQf->GetSurvWithMKModel_SplitDoseIrradiation();
 	if(GSM2Flag)
 	{
+		auto start_surv = std::chrono::high_resolution_clock::now();
 		aSurvRBEQf->SetGSM2_alphaX(GSM2_alphaX);
 		aSurvRBEQf->SetGSM2_betaX(GSM2_betaX);
 		aSurvRBEQf->SetGSM2_rd(GSM2_rd);
@@ -357,10 +384,34 @@ int main(int argc, char *argv[])
 		aSurvRBEQf->SetGSM2_a(GSM2_a);
 		aSurvRBEQf->SetGSM2_b(GSM2_b);
 		aSurvRBEQf->SetGSM2_r(GSM2_r);
+		aSurvRBEQf->SetGSM2_ion(GSM2_ion);
+		aSurvRBEQf->SetGSM2_LET(GSM2_LET);
 		
 		aSurvRBEQf->GetSurvWithGSM2();
+		auto stop = std::chrono::high_resolution_clock::now();
+		GSM2_time = std::chrono::duration_cast<std::chrono::seconds>(stop - start_surv);
 	}	
 	
+
+	auto stop = std::chrono::high_resolution_clock::now();
+	auto totaltime = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+
+	auto input_time = std::chrono::duration_cast<std::chrono::seconds>(stop_input - start);
+	auto calculation_time = std::chrono::duration_cast<std::chrono::seconds>(stop - stop_input);
+
+	double input_percentage = (double)input_time.count() / totaltime.count() * 100;
+	double calculation_percentage = (double)calculation_time.count() / totaltime.count() * 100;
+	double GSM2_percentage = (double)GSM2_time.count() / totaltime.count() * 100;
+
+	cout.precision(0);
+	cout << "\nTime Table:\n";
+	cout << "-----------------------------------\n";
+	cout << "Total Time: " << totaltime.count() << " seconds (" << fixed << totaltime.count() / 60.0 << " minutes)\n";
+	cout << "Input Parsing Time: " << input_time.count() << " seconds (" << fixed << input_percentage << "%)\n";
+	cout << "Total Calculation Time: " << calculation_time.count() << " seconds (" << fixed << calculation_percentage << "%)\n";
+	cout << "GSM2 Calculation Time: " << GSM2_time.count() << " seconds (" << fixed << GSM2_percentage << "%)\n";
+	cout << "-----------------------------------\n";
+
 //	aSurvRBEQf->GetSurvWithGSM2();	
 	return 0;
 }
