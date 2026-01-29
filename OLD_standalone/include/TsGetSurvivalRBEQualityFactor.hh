@@ -2,7 +2,7 @@
 // * MONAS is a C++ package that calculates cell surviavl curvs and        *
 // * dose dependednt RBE from microdosimetric spectra.			   *
 // *									   *
-// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@maastro.nl	   *
+// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@miami.edu>	   *
 // * 									   *
 // * This program is free software: you can redistribute it and/or modify  *
 // * it under the terms of the GNU General Public License as published by  *
@@ -93,8 +93,6 @@ class TsGetSurvivalRBEQualityFactor
 		void SetGSM2_r          (double num) { GSM2_r 		= num; }
 		void SetGSM2_alphaX     (double num) { GSM2_alphaX 	= num; }
 		void SetGSM2_betaX 	(double num) { GSM2_betaX 	= num; }
-		void SetGSM2_ion 	(const string& name) { GSM2_ion 	= name; }
-		void SetGSM2_LET 	(double num) { GSM2_LET 	= num; }
 		void SetBioWeightFunctionDataFile(string fileName ){ BioWeightFunctionDataFile= fileName; }
 
 		//MultieventIterations
@@ -127,8 +125,7 @@ class TsGetSurvivalRBEQualityFactor
 		std::vector<double> Doses;
 
 		double MKModel_alpha0,MKModel_alphaX, MKModel_beta, MKModel_betaX, MKModel_rho, MKModel_rd, MKModel_Rn, MKModel_y0, MKModel_D1, MKModel_D2, MKModel_ac, MKModel_tr;
-		double GSM2_kappa, GSM2_lambda, GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_LET, GSM2_zStart, GSM2_zEnd, GSM2_zBins, GSM2_alphaX, GSM2_betaX;
-		string GSM2_ion;
+		double GSM2_kappa, GSM2_lambda, GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_zStart, GSM2_zEnd, GSM2_zBins, GSM2_alphaX, GSM2_betaX;
 
 		string BioWeightFunctionDataFile;
 

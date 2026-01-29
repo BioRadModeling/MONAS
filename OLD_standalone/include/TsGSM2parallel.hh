@@ -2,7 +2,7 @@
 // * MONAS is a C++ package that calculates cell surviavl curvs and        *
 // * dose dependednt RBE from microdosimetric spectra.			   *
 // *									   *
-// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@maastro.nl>	   *
+// * Copyright © 2023 Giorgio Cartechini <giorgio.cartechini@miami.edu>	   *
 // * 									   *
 // * This program is free software: you can redistribute it and/or modify  *
 // * it under the terms of the GNU General Public License as published by  *
@@ -45,25 +45,11 @@ using namespace std;
 class TsGSM2 
 {
 	public:
-		TsGSM2(	double yF,
-			double yD, 
-			double Rd, 
-			double Rc, 
-			double kinA, 
-			double kinB, 
-			double kinR,
-			string ion,
-			double LET, 
-			std::vector<double> yVector, 
-			std::vector<std::vector<double>> yVector_Particle, 
-			std::vector<double> yVector_Nucleus, 
-			std::vector<std::vector<double>> yVector_Particle_Nucleus, 
-			bool GetStatisticInfo, 
-			int SpectrumUpdateTimes);
+		TsGSM2(double yF, double Rd, double Rc, double kinA, double kinB, double kinR, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, bool GetStatisticInfo, int SpectrumUpdateTimes);
 		~TsGSM2();
 
 		//input solo parametri biologici
-		double CalculateKappaFromLET(string ion, double LET); // New Kappa formulation
+		double CalculateKappaFromSpectra(); // New Kappa formulation
 		void InitializeHistograms(int bins, double start, double end);
 		void SetSpecificEnergySpectraCellNucleus();
 		void ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vector<double> &p0xy, double zn, int NumberOfSamples);
@@ -121,7 +107,7 @@ class TsGSM2
 		std::vector<vector<double>> hzfz_mevent_cell;
 
 
-		double GSM2Model_yF, GSM2Model_yD, GSM2Model_kappa, GSM2Model_lambda, GSM2Model_rd, GSM2Model_rc, GSM2_a, GSM2_r, GSM2_b;
+		double GSM2Model_yF, GSM2Model_kappa, GSM2Model_lambda, GSM2Model_rd, GSM2Model_rc, GSM2_a, GSM2_r, GSM2_b;
 
 		vector<vector<double>> p0x_zn, p0y_zn;
 
@@ -136,8 +122,6 @@ class TsGSM2
 		double **hfy_particle;
 		std::vector<double> hfy, hdy, hyfy, hydy, BinLimit, BinWidth;
 		
-		string GSM2_ion;
-		double GSM2_LET; // keV/um
 		
 		TsLinealEnergy* ySpectra_F;
 };
