@@ -875,7 +875,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		double rbe = 0., rbe_var = 0.;
 		if(D>0)
 		{ 
-			rbe = (sqrt( (alphaX*alphaX) - (4*betaX*log(s)) ) - alphaX)/(2*betaX*D);
+			rbe = (1/(2*D))*((alphaX/betaX)+sqrt((pow(alphaX,2)/pow(betaX,2))-4*log(s)));
 			rbe_var = (1./(pow(D*s,2)*(alphaX*alphaX-4*betaX*log(s))))*s_var;
 
 			for(int comp=0; comp<10; comp++)
