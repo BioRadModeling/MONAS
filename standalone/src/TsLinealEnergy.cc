@@ -96,7 +96,7 @@ void TsLinealEnergy::InitializeMicrodosimetricSpectrum()
 	BinLimit.resize(yBinNum+1);
 	BinWidth.resize(yBinNum);
 
-	BinLimit[0]=0.1;
+	BinLimit[0]=0.01;
 	for (int i=0;i<yBinNum;i++)
 	{
 		double aa = (double)((i+1)/yBinMagnitudeInterval);
