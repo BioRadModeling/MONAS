@@ -1,0 +1,3 @@
+/Users/kylediamond/MONAS/poly_micro_spectrum/build/CMakeFiles/poly_micro_spectrum.dir
+/Users/kylediamond/MONAS/poly_micro_spectrum/build/CMakeFiles/edit_cache.dir
+/Users/kylediamond/MONAS/poly_micro_spectrum/build/CMakeFiles/rebuild_cache.dir
