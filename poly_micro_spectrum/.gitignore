@@ -1,0 +1,7 @@
+
+# Large local test files
+poly_micro_spectrum/input/*.phsp
+poly_micro_spectrum/output/proton_matches_*.csv
+poly_micro_spectrum/output/*.jpg
+poly_micro_spectrum/output/poly_spectrum*.csv
+poly_micro_spectrum/output/energy_fluence*.csv

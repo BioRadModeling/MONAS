@@ -6,7 +6,6 @@
 
 struct PolySpectrum {
     std::vector<double> y;
-    std::vector<double> countsPerPrimary;  // averaged counts-per-primary per bin
     std::vector<double> f;
     std::vector<double> yf;
     std::vector<double> d;
@@ -15,13 +14,24 @@ struct PolySpectrum {
 
 class SpectrumAccumulator {
 public:
-    explicit SpectrumAccumulator(std::vector<double> yRef);
+    explicit SpectrumAccumulator(std::vector<double> yLowerEdges);
 
     void addContribution(const LookupTable& table, double particleWeight);
     PolySpectrum finalize() const;
 
 private:
-    std::vector<double> yRef_;
-    std::vector<double> weightedCountsPerPrimary_;
-    double totalWeight_{0.0};
+    // Native lookup-table y grid from the CSV first column
+    std::vector<double> nativeYLowerEdges_;
+
+    // R-style rebinned y grid
+    std::vector<double> targetEdges_;
+    std::vector<double> yCenters_;
+    std::vector<double> binWidths_;
+
+    // Weighted sum numerator on the rebinned grid
+    std::vector<double> numerator_;
+    double denominator_{0.0};
+
+    void buildTargetYBins();
+    std::vector<double> rebinCountsToTargetGrid(const LookupTable& table) const;
 };
