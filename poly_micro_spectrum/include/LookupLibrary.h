@@ -10,9 +10,11 @@ public:
     void loadFromDirectory(const std::filesystem::path& libraryDir);
 
     const LookupTable& findNearest(double energyMeV) const;
+    std::size_t findNearestIndex(double energyMeV) const;
 
     std::size_t size() const;
     const std::vector<double>& yReference() const;
+    const std::vector<LookupTable>& tables() const;
 
 private:
     std::vector<LookupTable> tables_;

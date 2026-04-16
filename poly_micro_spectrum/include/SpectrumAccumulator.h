@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 
+#include "LookupLibrary.h"
 #include "LookupTable.h"
 
 struct PolySpectrum {
@@ -14,24 +16,24 @@ struct PolySpectrum {
 
 class SpectrumAccumulator {
 public:
-    explicit SpectrumAccumulator(std::vector<double> yLowerEdges);
+    explicit SpectrumAccumulator(const LookupLibrary& library);
 
-    void addContribution(const LookupTable& table, double particleWeight);
+    void addContributionByIndex(std::size_t tableIndex, double multiplicity);
     PolySpectrum finalize() const;
 
 private:
-    // Native lookup-table y grid from the CSV first column
-    std::vector<double> nativeYLowerEdges_;
-
-    // R-style rebinned y grid
     std::vector<double> targetEdges_;
     std::vector<double> yCenters_;
     std::vector<double> binWidths_;
 
-    // Weighted sum numerator on the rebinned grid
+    // Precomputed rebinned monoenergetic contribution for each lookup table
+    std::vector<std::vector<double>> precomputedRawFyByTable_;
+
+    // Accumulated numerator on the rebinned grid
     std::vector<double> numerator_;
     double denominator_{0.0};
 
     void buildTargetYBins();
     std::vector<double> rebinCountsToTargetGrid(const LookupTable& table) const;
+    std::vector<double> buildPrecomputedRawFy(const LookupTable& table) const;
 };

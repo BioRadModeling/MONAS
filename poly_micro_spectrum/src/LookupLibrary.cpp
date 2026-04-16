@@ -88,9 +88,9 @@ void LookupLibrary::loadFromDirectory(const fs::path& libraryDir) {
     validateConsistentYGrid();
 }
 
-const LookupTable& LookupLibrary::findNearest(double energyMeV) const {
+std::size_t LookupLibrary::findNearestIndex(double energyMeV) const {
     if (tables_.empty()) {
-        throw std::runtime_error("LookupLibrary::findNearest called on empty library.");
+        throw std::runtime_error("LookupLibrary::findNearestIndex called on empty library.");
     }
 
     auto it = std::lower_bound(
@@ -100,20 +100,24 @@ const LookupTable& LookupLibrary::findNearest(double energyMeV) const {
         });
 
     if (it == tables_.begin()) {
-        return *it;
+        return 0;
     }
 
     if (it == tables_.end()) {
-        return tables_.back();
+        return tables_.size() - 1;
     }
 
-    const auto& upper = *it;
-    const auto& lower = *(it - 1);
+    const std::size_t upperIdx = static_cast<std::size_t>(std::distance(tables_.begin(), it));
+    const std::size_t lowerIdx = upperIdx - 1;
 
-    const double dLower = std::fabs(lower.monoEnergyMeV() - energyMeV);
-    const double dUpper = std::fabs(upper.monoEnergyMeV() - energyMeV);
+    const double dLower = std::fabs(tables_[lowerIdx].monoEnergyMeV() - energyMeV);
+    const double dUpper = std::fabs(tables_[upperIdx].monoEnergyMeV() - energyMeV);
 
-    return (dLower <= dUpper) ? lower : upper;
+    return (dLower <= dUpper) ? lowerIdx : upperIdx;
+}
+
+const LookupTable& LookupLibrary::findNearest(double energyMeV) const {
+    return tables_[findNearestIndex(energyMeV)];
 }
 
 std::size_t LookupLibrary::size() const {
@@ -122,6 +126,10 @@ std::size_t LookupLibrary::size() const {
 
 const std::vector<double>& LookupLibrary::yReference() const {
     return yReference_;
+}
+
+const std::vector<LookupTable>& LookupLibrary::tables() const {
+    return tables_;
 }
 
 void LookupLibrary::validateConsistentYGrid() const {

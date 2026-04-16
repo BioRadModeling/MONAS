@@ -810,5 +810,6 @@ CMakeFiles/poly_micro_spectrum.dir/src/CsvWriter.cpp.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/recursive_directory_iterator.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/u8path.h \
   /Users/kylediamond/MONAS/poly_micro_spectrum/include/SpectrumAccumulator.h \
+  /Users/kylediamond/MONAS/poly_micro_spectrum/include/LookupLibrary.h \
   /Users/kylediamond/MONAS/poly_micro_spectrum/include/LookupTable.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/fstream

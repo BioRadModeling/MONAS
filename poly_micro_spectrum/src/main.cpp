@@ -103,10 +103,14 @@ int main(int argc, char* argv[]) {
             std::vector<ProtonMatchRecord> matches;
             matches.reserve(protons.size());
 
-            SpectrumAccumulator accumulator(library.yReference());
+            // For build-spectrum, precompute rebinned monoenergetic spectra once
+            // and then accumulate by matched lookup-table index.
+            SpectrumAccumulator accumulator(library);
+            std::vector<std::size_t> matchCounts(library.size(), 0);
 
             for (const auto& proton : protons) {
-                const LookupTable& match = library.findNearest(proton.energyMeV);
+                const std::size_t matchIdx = library.findNearestIndex(proton.energyMeV);
+                const LookupTable& match = library.tables()[matchIdx];
 
                 matches.push_back(ProtonMatchRecord{
                     proton.rowIndex,
@@ -118,7 +122,7 @@ int main(int argc, char* argv[]) {
                 });
 
                 if (mode == "build-spectrum") {
-                    accumulator.addContribution(match, proton.weight);
+                    matchCounts[matchIdx] += 1;
                 }
             }
 
@@ -132,6 +136,15 @@ int main(int argc, char* argv[]) {
             std::cout << "Match CSV:          " << matchCsv << "\n";
 
             if (mode == "build-spectrum") {
+                for (std::size_t i = 0; i < matchCounts.size(); ++i) {
+                    if (matchCounts[i] == 0) {
+                        continue;
+                    }
+
+                    accumulator.addContributionByIndex(
+                        i, static_cast<double>(matchCounts[i]));
+                }
+
                 const PolySpectrum spectrum = accumulator.finalize();
                 const fs::path polyCsv = outputDir / "poly_spectrum.csv";
                 CsvWriter::writePolySpectrum(polyCsv, spectrum);
