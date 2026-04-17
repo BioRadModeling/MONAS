@@ -33,13 +33,11 @@ The lookup tables should already exist in this folder structure:
 
 ```text
 lookup_tables/
-  csv/
+  DeCunha/
     1mm_linear/
     1mm_logarithmic/
     5um_linear/
     5um_logarithmic/
-  les/
-  root/
 ```
 
 The code only uses the `csv/` folders.
@@ -132,13 +130,14 @@ This is the safest first test. It does **not** read the phase-space file yet.
 From `microdosimetry_with_LUTs/build`:
 
 ```bash
-./microdosimetry_with_LUTs test-lookup ../lookup_tables 1mm log 72.3
+./microdosimetry_with_LUTs test-lookup ../lookup_tables DeCunha 1mm log 72.3
 ```
 
 What this means:
 
 - `test-lookup` = run only the lookup-table test
 - `../lookup_tables` = where the lookup table library lives
+- `DeCunha` = name of the LUT to be used
 - `1mm` = use the 1 mm lookup library
 - `log` = use the logarithmic energy library
 - `72.3` = test proton energy in MeV
@@ -167,13 +166,14 @@ This reads the phase-space file, filters protons, matches each proton to the nea
 From `microdosimetry_with_LUTs/build`:
 
 ```bash
-./microdosimetry_with_LUTs audit-phsp ../lookup_tables 1mm log ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs audit-phsp ../lookup_tables Decunha 1mm log ../input/PhaseSpace.phsp ../output
 ```
 
 What this means:
 
 - `audit-phsp` = read the phase-space file and create the proton match audit file
 - `../lookup_tables` = lookup-table root folder
+- `DeCunha` = name of the LUT to be used
 - `1mm` = use the 1 mm library
 - `log` = use the logarithmic library
 - `../input/PhaseSpace.phsp` = input phase-space file
@@ -200,7 +200,7 @@ This is the main run.
 From `microdosimetry_with_LUTs/build`:
 
 ```bash
-./microdosimetry_with_LUTs build-spectrum ../lookup_tables 1mm log ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs build-spectrum ../lookup_tables Decunha 1mm log ../input/PhaseSpace.phsp ../output
 ```
 
 This command:
@@ -291,25 +291,25 @@ Examples:
 ### 1 mm, logarithmic lookup library
 
 ```bash
-./microdosimetry_with_LUTs build-spectrum ../lookup_tables 1mm log ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs build-spectrum ../lookup_tables Decunha 1mm log ../input/PhaseSpace.phsp ../output
 ```
 
 ### 1 mm, linear lookup library
 
 ```bash
-./microdosimetry_with_LUTs build-spectrum ../lookup_tables 1mm linear ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs build-spectrum ../lookup_tables 1mm Decunha linear ../input/PhaseSpace.phsp ../output
 ```
 
 ### 5 um, logarithmic lookup library
 
 ```bash
-./microdosimetry_with_LUTs build-spectrum ../lookup_tables 5um log ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs build-spectrum ../lookup_tables 5um Decunha log ../input/PhaseSpace.phsp ../output
 ```
 
 ### 5 um, linear lookup library
 
 ```bash
-./microdosimetry_with_LUTs build-spectrum ../lookup_tables 5um linear ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs build-spectrum ../lookup_tables 5um Decunha linear ../input/PhaseSpace.phsp ../output
 ```
 
 ---
@@ -321,8 +321,8 @@ If you are new and want the minimum set of commands, use these from `poly_micro_
 ```bash
 cmake ..
 make -j8
-./microdosimetry_with_LUTs test-lookup ../lookup_tables 1mm log 72.3
-./microdosimetry_with_LUTs build-spectrum ../lookup_tables 1mm log ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs test-lookup ../lookup_tables Decunha 1mm log 72.3
+./microdosimetry_with_LUTs build-spectrum ../lookup_tables Decunha 1mm log ../input/PhaseSpace.phsp ../output
 python3 ../macros/plot_spectrum.py ../output/poly_spectrum.csv --x y_keV_per_um --y yd_y --output-dir ../output --title "yd(y) vs y" --logx
 ```
 

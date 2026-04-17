@@ -46,18 +46,22 @@ int main(int argc, char* argv[]) {
         const std::string mode = argv[1];
 
         if (mode == "test-lookup") {
-            if (argc != 6) {
+            if (argc != 7) {
                 throw std::runtime_error(
-                    "test-lookup requires: <lookup_root> <1mm|5um> <linear|log> <test_energy_mev>");
+                    "test-lookup requires: <lookup_root> <lutName> <1mm|5um> <linear|log> <test_energy_mev>");
             }
 
             const fs::path lookupRoot = argv[2];
-            const std::string voxelSize = argv[3];
-            const std::string energyGrid = argv[4];
-            const double testEnergyMeV = std::stod(argv[5]);
+            const std::string lutName = argv[3];
+            const std::string voxelSize = argv[4];
+            const std::string energyGrid = argv[5];
+            const double testEnergyMeV = std::stod(argv[6]);
 
             const std::string folderName = resolveFolderName(voxelSize, energyGrid);
-            const fs::path libraryDir = lookupRoot / "csv" / folderName;
+            const fs::path libraryDir = lookupRoot / lutName / folderName;
+            if (!fs::exists(libraryDir) || !fs::is_directory(libraryDir)) {
+                throw std::runtime_error("Lookup library folder not found: " + libraryDir.string());
+            }
 
             LookupLibrary library;
             library.loadFromDirectory(libraryDir);
@@ -77,20 +81,24 @@ int main(int argc, char* argv[]) {
         }
 
         if (mode == "audit-phsp" || mode == "build-spectrum") {
-            if (argc != 7) {
+            if (argc != 8) {
                 throw std::runtime_error(
                     std::string(mode) +
-                    " requires: <lookup_root> <1mm|5um> <linear|log> <phsp_file> <output_dir>");
+                    " requires: <lookup_root> <lutName> <1mm|5um> <linear|log> <phsp_file> <output_dir>");
             }
 
             const fs::path lookupRoot = argv[2];
-            const std::string voxelSize = argv[3];
-            const std::string energyGrid = argv[4];
-            const fs::path phspFile = argv[5];
-            const fs::path outputDir = argv[6];
+            const std::string lutName = argv[3];
+            const std::string voxelSize = argv[4];
+            const std::string energyGrid = argv[5];
+            const fs::path phspFile = argv[6];
+            const fs::path outputDir = argv[7];
 
             const std::string folderName = resolveFolderName(voxelSize, energyGrid);
-            const fs::path libraryDir = lookupRoot / "csv" / folderName;
+            const fs::path libraryDir = lookupRoot / lutName / folderName;
+            if (!fs::exists(libraryDir) || !fs::is_directory(libraryDir)) {
+                throw std::runtime_error("Lookup library folder not found: " + libraryDir.string());
+            }
 
             LookupLibrary library;
             library.loadFromDirectory(libraryDir);
