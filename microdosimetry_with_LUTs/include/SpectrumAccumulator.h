@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cstddef>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
-#include "LookupLibrary.h"
 #include "LookupTable.h"
 
 struct PolySpectrum {
@@ -16,9 +16,9 @@ struct PolySpectrum {
 
 class SpectrumAccumulator {
 public:
-    explicit SpectrumAccumulator(const LookupLibrary& library);
+    SpectrumAccumulator();
 
-    void addContributionByIndex(std::size_t tableIndex, double multiplicity);
+    void addContribution(const LookupTable& table, double multiplicity);
     PolySpectrum finalize() const;
 
 private:
@@ -26,14 +26,23 @@ private:
     std::vector<double> yCenters_;
     std::vector<double> binWidths_;
 
-    // Precomputed rebinned monoenergetic contribution for each lookup table
-    std::vector<std::vector<double>> precomputedRawFyByTable_;
+    // Cache of precomputed monoenergetic contribution vectors,
+    // keyed by unique source file path.
+    std::unordered_map<std::string, std::vector<double>> precomputedRawFyCache_;
 
-    // Accumulated numerator on the rebinned grid
+    // Accumulated numerator on the rebinned grid.
     std::vector<double> numerator_;
     double denominator_{0.0};
 
     void buildTargetYBins();
-    std::vector<double> rebinCountsToTargetGrid(const LookupTable& table) const;
+
+    std::vector<double> rebinDiscreteValuesToTargetGrid(
+        const std::vector<double>& srcY,
+        const std::vector<double>& srcValues) const;
+
     std::vector<double> buildPrecomputedRawFy(const LookupTable& table) const;
+    std::vector<double> buildDeCunhaPrecomputedRawFy(
+        const LookupTable& table) const;
+    std::vector<double> buildCartechiniPrecomputedRawFy(
+        const LookupTable& table) const;
 };

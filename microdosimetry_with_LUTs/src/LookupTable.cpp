@@ -2,8 +2,12 @@
 
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -29,16 +33,20 @@ bool tryParseDouble(const std::string& s, double& value) {
     }
 }
 
-} // namespace
+}  // namespace
 
 LookupTable::LookupTable(double monoEnergyMeV,
+                         LookupSpectrumKind spectrumKind,
                          std::vector<double> yLowerEdges,
                          std::vector<double> nY,
+                         std::vector<double> fY,
                          double ncpp,
                          std::string sourceFile)
     : monoEnergyMeV_(monoEnergyMeV),
+      spectrumKind_(spectrumKind),
       yLowerEdges_(std::move(yLowerEdges)),
       nY_(std::move(nY)),
+      fY_(std::move(fY)),
       ncpp_(ncpp),
       sourceFile_(std::move(sourceFile)) {}
 
@@ -51,10 +59,9 @@ LookupTable LookupTable::loadFromCsv(const std::filesystem::path& csvPath,
 
     std::vector<double> yLowerEdges;
     std::vector<double> nY;
-
     double detectedNcpp = -1.0;
-    std::string line;
 
+    std::string line;
     while (std::getline(in, line)) {
         if (line.empty()) {
             continue;
@@ -67,7 +74,6 @@ LookupTable LookupTable::loadFromCsv(const std::filesystem::path& csvPath,
 
         double y = 0.0;
         double ny = 0.0;
-
         if (!tryParseDouble(fields[0], y) || !tryParseDouble(fields[1], ny)) {
             continue;
         }
@@ -97,14 +103,66 @@ LookupTable LookupTable::loadFromCsv(const std::filesystem::path& csvPath,
     }
 
     return LookupTable(monoEnergyMeV,
+                       LookupSpectrumKind::DeCunhaRawCounts,
                        std::move(yLowerEdges),
                        std::move(nY),
+                       {},
                        detectedNcpp,
                        csvPath.string());
 }
 
+LookupTable LookupTable::loadFromCartechiniYSpec(
+    const std::filesystem::path& ySpecPath,
+    double monoEnergyMeV) {
+    std::ifstream in(ySpecPath);
+    if (!in) {
+        throw std::runtime_error("Failed to open Cartechini ySpec file: " +
+                                 ySpecPath.string());
+    }
+
+    std::vector<double> yLowerEdges;
+    std::vector<double> fY;
+
+    std::string line;
+    while (std::getline(in, line)) {
+        if (line.empty()) {
+            continue;
+        }
+
+        std::istringstream iss(line);
+        double y = 0.0;
+        double fy = 0.0;
+
+        // Numeric data rows begin with y then f(y).
+        // Summary/header rows fail this parse and are skipped.
+        if (!(iss >> y >> fy)) {
+            continue;
+        }
+
+        yLowerEdges.push_back(y);
+        fY.push_back(fy);
+    }
+
+    if (yLowerEdges.empty() || fY.empty()) {
+        throw std::runtime_error(
+            "No valid y / f(y) rows found in file: " + ySpecPath.string());
+    }
+
+    return LookupTable(monoEnergyMeV,
+                       LookupSpectrumKind::CartechiniFy,
+                       std::move(yLowerEdges),
+                       {},
+                       std::move(fY),
+                       std::numeric_limits<double>::quiet_NaN(),
+                       ySpecPath.string());
+}
+
 double LookupTable::monoEnergyMeV() const {
     return monoEnergyMeV_;
+}
+
+LookupSpectrumKind LookupTable::spectrumKind() const {
+    return spectrumKind_;
 }
 
 double LookupTable::ncpp() const {
@@ -117,6 +175,10 @@ const std::vector<double>& LookupTable::yLowerEdges() const {
 
 const std::vector<double>& LookupTable::nY() const {
     return nY_;
+}
+
+const std::vector<double>& LookupTable::fY() const {
+    return fY_;
 }
 
 const std::string& LookupTable::sourceFile() const {

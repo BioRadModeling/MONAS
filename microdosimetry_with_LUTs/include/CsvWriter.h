@@ -14,6 +14,7 @@ struct ProtonMatchRecord {
     double matchedEnergyMeV;
     std::string matchedFile;
     double matchedNcpp;
+    std::string matchedFamily;
 };
 
 class CsvWriter {
