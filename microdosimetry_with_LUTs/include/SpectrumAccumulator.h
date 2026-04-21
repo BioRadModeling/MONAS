@@ -26,6 +26,8 @@ public:
     PolySpectrum finalize() const;
 
 private:
+    // Common interval representation used by both rebinners.
+    // "masses" means spectral weight carried by each source interval.
     struct SourceIntervalData {
         std::vector<double> lower;
         std::vector<double> upper;
@@ -53,14 +55,18 @@ private:
         std::size_t nSamples,
         std::uint64_t seed) const;
 
+    // Exact log-bin overlap rebinning used mainly for DeCunha N(y) histograms.
     std::vector<double> rebinCountsToTargetGridStochastic(
         const LookupTable& table,
         std::size_t nSamples,
         std::uint64_t seed) const;
 
+    // Monte Carlo rebinning used mainly for Cartechini f(y) LUTs.
     std::vector<double> rebinCountsToTargetGridDeterministic(
         const LookupTable& table) const;
 
+    // Applies the family-specific rebinning policy and stores the rebinned
+    // monoenergetic spectrum on the shared target grid.
     std::vector<double> buildPrecomputedRawFy(
         const LookupTable& table,
         std::size_t tableIndex) const;

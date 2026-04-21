@@ -65,6 +65,24 @@ void SpectrumAccumulator::buildTargetYBins() {
     }
 }
 
+// Build a common interval representation of the source LUT before rebinning.
+//
+// For Cartechini, the source data are tabulated f(y) values on a coarse native
+// y grid. In that case, each interval mass is estimated by integrating f(y)
+// over [y_i, y_{i+1}] using the trapezoidal rule.
+//
+// For DeCunha, the source data are raw histogram counts N(y). Each native bin
+// already carries a fixed amount of spectral weight, so the interval mass is
+// taken directly from the stored bin content rather than multiplying by bin
+// width again.
+//
+// The returned SourceIntervalData stores:
+//   - lower edge of each source interval
+//   - upper edge of each source interval
+//   - spectral weight ("mass") carried by that interval
+//
+// This interval representation is then consumed by either the stochastic
+// rebinner or the deterministic overlap rebinner.
 SpectrumAccumulator::SourceIntervalData
 SpectrumAccumulator::buildSourceIntervals(const LookupTable& table) const {
     const auto& srcY = table.yLowerEdges();
@@ -178,6 +196,22 @@ SpectrumAccumulator::buildSourceIntervals(const LookupTable& table) const {
         ", fY size = " + std::to_string(table.fY().size()));
 }
 
+// Rebin a source spectrum onto the common target y grid by stochastic sampling.
+//
+// The input intervals define a piecewise distribution over y. We first build a
+// CDF from the interval spectral weights, then repeatedly:
+//
+//   1. sample a source interval according to its weight
+//   2. sample one y value inside that interval
+//   3. place the sampled y into the corresponding target bin
+//
+// Sampling inside the chosen interval is uniform in log10(y), which is natural
+// for microdosimetric spectra spanning multiple orders of magnitude and helps
+// avoid artificial empty bins when the native source grid is coarse.
+//
+// This method is primarily used for Cartechini f(y) LUTs, whose native spacing
+// is sparse enough that direct point-to-bin remapping can produce comb-like
+// zero bins on the target grid.
 std::vector<double> SpectrumAccumulator::sampleCountsToTargetGrid(
     const SourceIntervalData& intervals,
     std::size_t nSamples,
@@ -257,6 +291,12 @@ std::vector<double> SpectrumAccumulator::sampleCountsToTargetGrid(
     return rebinnedCounts;
 }
 
+// Wrapper for the stochastic rebinner.
+//
+// This converts the LUT into interval form and then performs Monte Carlo
+// transport of spectral weight onto the target grid. It is kept as a separate
+// function so the family-specific rebinning policy can be expressed clearly
+// in buildPrecomputedRawFy().
 std::vector<double> SpectrumAccumulator::rebinCountsToTargetGridStochastic(
     const LookupTable& table,
     std::size_t nSamples,
@@ -266,6 +306,18 @@ std::vector<double> SpectrumAccumulator::rebinCountsToTargetGridStochastic(
     return sampleCountsToTargetGrid(intervals, nSamples, seed);
 }
 
+// Rebin a source spectrum onto the common target y grid by deterministic
+// log-bin overlap.
+//
+// Each source interval is treated as carrying a fixed amount of spectral weight.
+// That weight is redistributed across target bins according to the fraction of
+// overlap in log10(y) space between the source interval and each target bin.
+//
+// No random sampling is performed, so this method is noise-free and exactly
+// reproducible. It is the preferred method for DeCunha LUTs because those
+// files store native histogram bin contents N(y), meaning each source bin
+// already has a well-defined amount of spectral weight that should be
+// transported directly to the target grid.
 std::vector<double> SpectrumAccumulator::rebinCountsToTargetGridDeterministic(
     const LookupTable& table) const {
 
@@ -319,6 +371,23 @@ std::vector<double> SpectrumAccumulator::rebinCountsToTargetGridDeterministic(
     return rebinnedCounts;
 }
 
+// Precompute the monoenergetic contribution on the shared target y grid.
+//
+// This is where the family-specific rebinning policy is applied:
+//
+//   - Cartechini:
+//       The source LUT stores f(y) directly on a coarse native grid.
+//       We rebin it stochastically to avoid artificial zero bins, then
+//       normalize the rebinned result back to a density on the target grid.
+//
+//   - DeCunha:
+//       The source LUT stores raw histogram counts N(y) together with Ncpp.
+//       We rebin by deterministic log-bin overlap so native bin content is
+//       preserved without Monte Carlo noise, then convert the rebinned counts
+//       into the raw f(y)-like quantity used later in polyenergetic summation.
+//
+// The output of this function is stored once per LUT and reused during
+// accumulation to avoid repeating the rebinning work for every proton.
 std::vector<double> SpectrumAccumulator::buildPrecomputedRawFy(
     const LookupTable& table,
     std::size_t tableIndex) const {
