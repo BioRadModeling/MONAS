@@ -23,6 +23,14 @@ public:
         std::uint64_t rebinSeed = 0x5A17C3E4ULL);
 
     void addContributionByIndex(std::size_t tableIndex, double multiplicity);
+
+    // Combine two precomputed monoenergetic spectra with linear-interpolation
+    // weights, then add the result to the polyenergetic numerator.
+    void addInterpolatedContribution(std::size_t lowerTableIndex,
+                                     std::size_t upperTableIndex,
+                                     double lowerWeight,
+                                     double upperWeight,
+                                     double multiplicity);
     PolySpectrum finalize() const;
 
 private:

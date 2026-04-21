@@ -454,17 +454,45 @@ void SpectrumAccumulator::addContributionByIndex(
     std::size_t tableIndex,
     double multiplicity) {
 
+    addInterpolatedContribution(tableIndex, tableIndex, 1.0, 0.0, multiplicity);
+}
+
+// Interpolate between the two precomputed monoenergetic spectra selected for a
+// proton, then scale that interpolated spectrum by the proton multiplicity.
+void SpectrumAccumulator::addInterpolatedContribution(
+    std::size_t lowerTableIndex,
+    std::size_t upperTableIndex,
+    double lowerWeight,
+    double upperWeight,
+    double multiplicity) {
+
     if (multiplicity <= 0.0) {
         return;
     }
 
-    if (tableIndex >= precomputedRawFyByTable_.size()) {
-        throw std::runtime_error("SpectrumAccumulator received invalid table index.");
+    if (lowerTableIndex >= precomputedRawFyByTable_.size() ||
+        upperTableIndex >= precomputedRawFyByTable_.size()) {
+        throw std::runtime_error(
+            "SpectrumAccumulator received invalid interpolation table index.");
     }
 
-    const auto& rawFy = precomputedRawFyByTable_[tableIndex];
-    for (std::size_t i = 0; i < rawFy.size(); ++i) {
-        numerator_[i] += multiplicity * rawFy[i];
+    if (lowerWeight < 0.0 || upperWeight < 0.0) {
+        throw std::runtime_error(
+            "SpectrumAccumulator received negative interpolation weights.");
+    }
+
+    const double weightSum = lowerWeight + upperWeight;
+    if (!(weightSum > 0.0)) {
+        return;
+    }
+
+    const auto& lowerRawFy = precomputedRawFyByTable_[lowerTableIndex];
+    const auto& upperRawFy = precomputedRawFyByTable_[upperTableIndex];
+
+    for (std::size_t i = 0; i < lowerRawFy.size(); ++i) {
+        const double interpolatedRawFy =
+            lowerWeight * lowerRawFy[i] + upperWeight * upperRawFy[i];
+        numerator_[i] += multiplicity * interpolatedRawFy;
     }
     denominator_ += multiplicity;
 }

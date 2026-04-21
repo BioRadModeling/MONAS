@@ -6,7 +6,7 @@ It does **not** run the full MONAS survival/RBE workflow. Its job is:
 
 1. read the phase-space file line by line,
 2. keep only proton rows,
-3. match each proton energy to the **nearest** monoenergetic lookup-table CSV,
+3. bracket each proton energy between two monoenergetic lookup spectra and linearly interpolate between them,
 4. combine all matched spectra using the proton weights,
 5. save the final polyenergetic spectrum as a CSV,
 6. optional: plot selected quantities from that CSV as a JPEG.
@@ -52,6 +52,118 @@ The proton energy is parsed from the filename.
 
 ---
 
+## How energy matching works
+
+For each proton in the phase-space file, the code reads its kinetic energy
+`E_12` from column 6 and searches the selected LUT library for the two
+monoenergetic spectra with energies `E_1` and `E_2` such that:
+
+```text
+E_1 <= E_12 <= E_2
+```
+
+The monoenergetic spectrum used for that proton is then built by linear
+interpolation:
+
+```text
+f_E12(y) = f_E2(y) + ((E_12 - E_2) / (E_1 - E_2)) * (f_E1(y) - f_E2(y))
+```
+
+This is equivalent to:
+
+```text
+f_E12(y) = w_1 * f_E1(y) + w_2 * f_E2(y)
+```
+
+with:
+
+```text
+w_1 = (E_2 - E_12) / (E_2 - E_1)
+w_2 = (E_12 - E_1) / (E_2 - E_1)
+```
+
+The interpolation is applied after each monoenergetic LUT has already been
+converted onto the common target `y` grid used for the final spectrum.
+
+### Out-of-range energies
+
+If a proton energy lies outside the available LUT range, the code keeps the
+current endpoint behavior:
+
+- if `E_12` is below the minimum LUT energy, it uses the lowest-energy LUT only
+- if `E_12` is above the maximum LUT energy, it uses the highest-energy LUT only
+
+That means the interpolation weights collapse to one endpoint:
+
+- lower endpoint only: `w_1 = 1`, `w_2 = 0`
+- upper endpoint only: `w_1 = 1`, `w_2 = 0` when both indices are the same
+
+### Cartechini fallback behavior
+
+When the selected family is `Cartechini`, the code behaves in two regions:
+
+- for energies at or below the maximum Cartechini LUT energy, interpolation is
+  done only within the Cartechini subset
+- for energies above the maximum Cartechini LUT energy, the code switches
+  entirely to the fallback `DeCunha/1mm_logarithmic` subset and performs the
+  interpolation there
+
+---
+
+## How rebinning works
+
+Before spectra from different proton energies can be combined, each
+monoenergetic LUT is converted onto the same target `y` grid used for the final
+polyenergetic spectrum. The code uses different rebinning strategies for the
+two LUT families because the source data are stored differently.
+
+### DeCunha LUTs: deterministic log-bin overlap
+
+DeCunha LUTs store raw histogram counts `N(y)` together with `Ncpp`.
+
+For these LUTs, the code:
+
+1. interprets each source bin as carrying a fixed amount of spectral weight
+2. compares that source bin to every target bin in `log10(y)` space
+3. computes the fraction of overlap between the source bin and each target bin
+4. transfers the source-bin weight to the target grid according to those
+   overlap fractions
+
+Because the rebinning is based on exact overlap in logarithmic bin space:
+
+- no random sampling is used
+- the result is noise-free
+- the result is exactly reproducible from run to run
+
+After that, the rebinned counts are converted into the internal monoenergetic
+quantity used later in accumulation.
+
+### Cartechini LUTs: stochastic sampling
+
+Cartechini LUTs store tabulated `f(y)` values on a relatively coarse native
+grid rather than raw histogram counts.
+
+For these LUTs, the code first converts the source `f(y)` curve into interval
+masses by integrating `f(y)` over each source interval. It then rebins those
+interval masses onto the target grid by stochastic sampling:
+
+1. build a cumulative distribution from the interval masses
+2. repeatedly sample one source interval according to its weight
+3. sample one `y` value inside that interval, uniformly in `log10(y)`
+4. place that sampled `y` into the corresponding target bin
+
+This Monte Carlo rebinning helps avoid comb-like empty bins that can appear if a
+coarse Cartechini source grid is mapped directly onto a finer target grid.
+
+Once the rebinned sample counts are obtained, they are normalized back into the
+internal monoenergetic `f(y)`-like quantity used in the polyenergetic
+accumulation.
+
+If the stochastic rebinner produces no usable counts, the code falls back to a
+deterministic overlap-based rebinning for robustness.
+
+---
+
 ## What gets written to `output/`
 
 After a successful run, you should see these files:
@@ -64,9 +176,16 @@ Columns:
 - `row_index`
 - `energy_mev`
 - `weight`
-- `matched_energy_mev`
-- `matched_file`
-- `matched_ncpp`
+- `lower_matched_energy_mev`
+- `upper_matched_energy_mev`
+- `lower_interpolation_weight`
+- `upper_interpolation_weight`
+- `lower_matched_file`
+- `upper_matched_file`
+- `lower_matched_ncpp`
+- `upper_matched_ncpp`
+- `lower_matched_family`
+- `upper_matched_family`
 
 ### 2. `poly_spectrum.csv`
 The final polyenergetic spectrum.
@@ -150,9 +269,14 @@ Library folder:     "../lookup_tables/csv/1mm_logarithmic"
 Number of tables:   300
 Y bins:             3000
 Requested energy:   72.3 MeV
-Matched energy:     71.4998 MeV
-Matched CSV:        ../lookup_tables/csv/1mm_logarithmic/Proton_71.499794_MeV.csv
-Detected Ncpp:      917.274
+Lower matched energy:   71.4998 MeV
+Upper matched energy:   74.5801 MeV
+Lower weight:           0.740218
+Upper weight:           0.259782
+Lower matched file:     ../lookup_tables/csv/1mm_logarithmic/Proton_71.499794_MeV.csv
+Upper matched file:     ../lookup_tables/csv/1mm_logarithmic/Proton_74.580093_MeV.csv
+Lower detected Ncpp:    917.274
+Upper detected Ncpp:    910.492
 ```
 
 If this works, your lookup tables are being found and parsed correctly.
@@ -161,7 +285,9 @@ If this works, your lookup tables are being found and parsed correctly.
 
 ## Step 3: audit the phase-space file
 
-This reads the phase-space file, filters protons, matches each proton to the nearest lookup spectrum, and writes `proton_matches.csv`.
+This reads the phase-space file, filters protons, brackets each proton energy
+between two LUT energies, computes the interpolation weights, and writes
+`proton_matches.csv`.
 
 From `microdosimetry_with_LUTs/build`:
 
@@ -189,7 +315,7 @@ Protons found:      552711
 Output CSV:         "../output/proton_matches.csv"
 ```
 
-If this works, the proton filtering and nearest-energy matching are working.
+If this works, the proton filtering and interpolation matching are working.
 
 ---
 
@@ -207,7 +333,7 @@ This command:
 
 - reads the phase-space file,
 - keeps only protons,
-- matches each proton to the nearest monoenergetic lookup spectrum,
+- interpolates each proton between two monoenergetic lookup spectra,
 - accumulates the weighted contributions,
 - writes both:
   - `../output/proton_matches.csv`

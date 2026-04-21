@@ -243,6 +243,62 @@ std::size_t LookupLibrary::findNearestIndexInSubset(
     return (dLower <= dUpper) ? lowerTableIdx : upperTableIdx;
 }
 
+// Locate the two LUT energies that bracket the requested proton energy and
+// compute the linear-interpolation weights on the energy axis. If the proton
+// lies outside the subset range, clamp to the nearest endpoint LUT.
+InterpolationMatch LookupLibrary::findInterpolationMatchInSubset(
+    double energyMeV,
+    const std::vector<std::size_t>& subset) const {
+    if (subset.empty()) {
+        throw std::runtime_error("Attempted interpolation search on empty subset.");
+    }
+
+    auto cmp = [&](std::size_t idx, double value) {
+        return tables_[idx].monoEnergyMeV() < value;
+    };
+
+    auto it = std::lower_bound(subset.begin(), subset.end(), energyMeV, cmp);
+
+    if (it == subset.begin()) {
+        const std::size_t idx = *it;
+        return InterpolationMatch{idx, idx, 1.0, 0.0};
+    }
+
+    if (it == subset.end()) {
+        const std::size_t idx = subset.back();
+        return InterpolationMatch{idx, idx, 1.0, 0.0};
+    }
+
+    const std::size_t upperTableIdx = *it;
+    const std::size_t lowerTableIdx = *(it - 1);
+
+    const double lowerEnergy = tables_[lowerTableIdx].monoEnergyMeV();
+    const double upperEnergy = tables_[upperTableIdx].monoEnergyMeV();
+
+    if (!(upperEnergy > lowerEnergy)) {
+        return InterpolationMatch{lowerTableIdx, lowerTableIdx, 1.0, 0.0};
+    }
+
+    const double upperWeight =
+        (energyMeV - lowerEnergy) / (upperEnergy - lowerEnergy);
+    const double lowerWeight = 1.0 - upperWeight;
+
+    if (upperWeight <= 0.0) {
+        return InterpolationMatch{lowerTableIdx, lowerTableIdx, 1.0, 0.0};
+    }
+
+    if (lowerWeight <= 0.0) {
+        return InterpolationMatch{upperTableIdx, upperTableIdx, 1.0, 0.0};
+    }
+
+    return InterpolationMatch{
+        lowerTableIdx,
+        upperTableIdx,
+        lowerWeight,
+        upperWeight
+    };
+}
+
 std::size_t LookupLibrary::findNearestIndex(double energyMeV) const {
     if (tables_.empty()) {
         throw std::runtime_error(
@@ -270,6 +326,37 @@ std::size_t LookupLibrary::findNearestIndex(double energyMeV) const {
         allIndices[i] = i;
     }
     return findNearestIndexInSubset(energyMeV, allIndices);
+}
+
+// Dispatch interpolation matching to the active LUT family while preserving
+// the existing Cartechini-above-range fallback to DeCunha/1mm_logarithmic.
+InterpolationMatch LookupLibrary::findInterpolationMatch(double energyMeV) const {
+    if (tables_.empty()) {
+        throw std::runtime_error(
+            "LookupLibrary::findInterpolationMatch called on empty library.");
+    }
+
+    if (activeFamily_ == LutFamily::Cartechini) {
+        if (energyMeV > maxCartechiniEnergyMeV_) {
+            if (fallbackDeCunhaIndices_.empty()) {
+                throw std::runtime_error(
+                    "Cartechini fallback requested, but no DeCunha fallback tables were loaded.");
+            }
+            return findInterpolationMatchInSubset(energyMeV, fallbackDeCunhaIndices_);
+        }
+
+        if (cartechiniIndices_.empty()) {
+            throw std::runtime_error(
+                "Cartechini library loaded without any Cartechini tables.");
+        }
+        return findInterpolationMatchInSubset(energyMeV, cartechiniIndices_);
+    }
+
+    std::vector<std::size_t> allIndices(tables_.size());
+    for (std::size_t i = 0; i < tables_.size(); ++i) {
+        allIndices[i] = i;
+    }
+    return findInterpolationMatchInSubset(energyMeV, allIndices);
 }
 
 const LookupTable& LookupLibrary::findNearest(double energyMeV) const {

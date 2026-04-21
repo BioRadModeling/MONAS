@@ -168,16 +168,24 @@ int main(int argc, char* argv[]) {
             LookupLibrary library;
             library.loadFromDirectory(libraryDir, family);
 
-            const LookupTable& match = library.findNearest(testEnergyMeV);
+            const InterpolationMatch match =
+                library.findInterpolationMatch(testEnergyMeV);
+            const LookupTable& lowerMatch = library.tables()[match.lowerIndex];
+            const LookupTable& upperMatch = library.tables()[match.upperIndex];
 
             std::cout << "Loaded library successfully.\n";
             std::cout << "Library folder: " << libraryDir << "\n";
             std::cout << "Number of tables: " << library.size() << "\n";
             std::cout << "Y bins: " << library.yReference().size() << "\n";
             std::cout << "Requested energy: " << testEnergyMeV << " MeV\n";
-            std::cout << "Matched energy: " << match.monoEnergyMeV() << " MeV\n";
-            std::cout << "Matched CSV: " << match.sourceFile() << "\n";
-            std::cout << "Detected Ncpp: " << match.ncpp() << "\n";
+            std::cout << "Lower matched energy: " << lowerMatch.monoEnergyMeV() << " MeV\n";
+            std::cout << "Upper matched energy: " << upperMatch.monoEnergyMeV() << " MeV\n";
+            std::cout << "Lower weight: " << match.lowerWeight << "\n";
+            std::cout << "Upper weight: " << match.upperWeight << "\n";
+            std::cout << "Lower matched file: " << lowerMatch.sourceFile() << "\n";
+            std::cout << "Upper matched file: " << upperMatch.sourceFile() << "\n";
+            std::cout << "Lower detected Ncpp: " << lowerMatch.ncpp() << "\n";
+            std::cout << "Upper detected Ncpp: " << upperMatch.ncpp() << "\n";
             return 0;
         }
 
@@ -258,14 +266,19 @@ int main(int argc, char* argv[]) {
             matches.reserve(protons.size());
 
             SpectrumAccumulator accumulator(library, rebinSamples, rebinSeed);
-            std::vector<std::size_t> matchCounts(library.size(), 0);
 
             for (const auto& proton : protons) {
-                const std::size_t matchIdx = library.findNearestIndex(proton.energyMeV);
-                const LookupTable& match = library.tables()[matchIdx];
+                const InterpolationMatch match =
+                    library.findInterpolationMatch(proton.energyMeV);
+                const LookupTable& lowerMatch = library.tables()[match.lowerIndex];
+                const LookupTable& upperMatch = library.tables()[match.upperIndex];
 
-                const std::string matchedFamily =
-                    (match.spectrumKind() == LookupSpectrumKind::CartechiniFy)
+                const std::string lowerMatchedFamily =
+                    (lowerMatch.spectrumKind() == LookupSpectrumKind::CartechiniFy)
+                        ? "Cartechini"
+                        : "DeCunha";
+                const std::string upperMatchedFamily =
+                    (upperMatch.spectrumKind() == LookupSpectrumKind::CartechiniFy)
                         ? "Cartechini"
                         : "DeCunha";
 
@@ -273,14 +286,25 @@ int main(int argc, char* argv[]) {
                     proton.rowIndex,
                     proton.energyMeV,
                     proton.weight,
-                    match.monoEnergyMeV(),
-                    match.sourceFile(),
-                    match.ncpp(),
-                    matchedFamily
+                    lowerMatch.monoEnergyMeV(),
+                    upperMatch.monoEnergyMeV(),
+                    match.lowerWeight,
+                    match.upperWeight,
+                    lowerMatch.sourceFile(),
+                    upperMatch.sourceFile(),
+                    lowerMatch.ncpp(),
+                    upperMatch.ncpp(),
+                    lowerMatchedFamily,
+                    upperMatchedFamily
                 });
 
                 if (mode == "build-spectrum") {
-                    matchCounts[matchIdx] += 1;
+                    accumulator.addInterpolatedContribution(
+                        match.lowerIndex,
+                        match.upperIndex,
+                        match.lowerWeight,
+                        match.upperWeight,
+                        proton.weight);
                 }
             }
 
@@ -296,15 +320,6 @@ int main(int argc, char* argv[]) {
             if (mode == "build-spectrum") {
                 std::cout << "Rebin samples per LUT: " << rebinSamples << "\n";
                 std::cout << "Rebin seed: " << rebinSeed << "\n";
-
-                for (std::size_t i = 0; i < matchCounts.size(); ++i) {
-                    if (matchCounts[i] == 0) {
-                        continue;
-                    }
-
-                    accumulator.addContributionByIndex(
-                        i, static_cast<double>(matchCounts[i]));
-                }
 
                 const PolySpectrum spectrum = accumulator.finalize();
                 const fs::path polyCsv = outputDir / "poly_spectrum.csv";

@@ -11,10 +11,16 @@ struct ProtonMatchRecord {
     std::size_t rowIndex;
     double energyMeV;
     double weight;
-    double matchedEnergyMeV;
-    std::string matchedFile;
-    double matchedNcpp;
-    std::string matchedFamily;
+    double lowerMatchedEnergyMeV;
+    double upperMatchedEnergyMeV;
+    double lowerInterpolationWeight;
+    double upperInterpolationWeight;
+    std::string lowerMatchedFile;
+    std::string upperMatchedFile;
+    double lowerMatchedNcpp;
+    double upperMatchedNcpp;
+    std::string lowerMatchedFamily;
+    std::string upperMatchedFamily;
 };
 
 class CsvWriter {

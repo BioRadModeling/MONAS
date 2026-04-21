@@ -12,16 +12,27 @@ void CsvWriter::writeProtonMatches(
             "Failed to open output CSV for writing: " + outPath.string());
     }
 
-    out << "row_index,energy_mev,weight,matched_energy_mev,matched_file,matched_ncpp,matched_family\n";
+    out << "row_index,energy_mev,weight,"
+        << "lower_matched_energy_mev,upper_matched_energy_mev,"
+        << "lower_interpolation_weight,upper_interpolation_weight,"
+        << "lower_matched_file,upper_matched_file,"
+        << "lower_matched_ncpp,upper_matched_ncpp,"
+        << "lower_matched_family,upper_matched_family\n";
 
     for (const auto& m : matches) {
         out << m.rowIndex << ','
             << m.energyMeV << ','
             << m.weight << ','
-            << m.matchedEnergyMeV << ','
-            << '"' << m.matchedFile << '"' << ','
-            << m.matchedNcpp << ','
-            << '"' << m.matchedFamily << '"'
+            << m.lowerMatchedEnergyMeV << ','
+            << m.upperMatchedEnergyMeV << ','
+            << m.lowerInterpolationWeight << ','
+            << m.upperInterpolationWeight << ','
+            << '"' << m.lowerMatchedFile << '"' << ','
+            << '"' << m.upperMatchedFile << '"' << ','
+            << m.lowerMatchedNcpp << ','
+            << m.upperMatchedNcpp << ','
+            << '"' << m.lowerMatchedFamily << '"' << ','
+            << '"' << m.upperMatchedFamily << '"'
             << '\n';
     }
 }
