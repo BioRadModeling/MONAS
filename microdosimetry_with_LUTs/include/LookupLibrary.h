@@ -30,6 +30,12 @@ private:
     std::vector<LookupTable> tables_;
     std::vector<double> yReference_;
 
+    LutFamily activeFamily_{LutFamily::DeCunha};
+
+    std::vector<std::size_t> cartechiniIndices_;
+    std::vector<std::size_t> fallbackDeCunhaIndices_;
+    double maxCartechiniEnergyMeV_{-1.0};
+
     void loadDeCunhaDirectory(const std::filesystem::path& libraryDir);
     void loadCartechiniDirectory(const std::filesystem::path& libraryDir);
 
@@ -41,4 +47,9 @@ private:
         const std::filesystem::path& folderPath);
 
     void validateConsistentYGrid() const;
+    void rebuildFamilyIndexCaches();
+
+    std::size_t findNearestIndexInSubset(
+        double energyMeV,
+        const std::vector<std::size_t>& subset) const;
 };

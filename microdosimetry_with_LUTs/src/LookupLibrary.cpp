@@ -133,10 +133,33 @@ void LookupLibrary::loadCartechiniDirectory(const fs::path& libraryDir) {
     }
 }
 
+void LookupLibrary::rebuildFamilyIndexCaches() {
+    cartechiniIndices_.clear();
+    fallbackDeCunhaIndices_.clear();
+    maxCartechiniEnergyMeV_ = -1.0;
+
+    for (std::size_t i = 0; i < tables_.size(); ++i) {
+        const auto kind = tables_[i].spectrumKind();
+
+        if (kind == LookupSpectrumKind::CartechiniFy) {
+            cartechiniIndices_.push_back(i);
+            if (tables_[i].monoEnergyMeV() > maxCartechiniEnergyMeV_) {
+                maxCartechiniEnergyMeV_ = tables_[i].monoEnergyMeV();
+            }
+        } else if (kind == LookupSpectrumKind::DeCunhaRawCounts) {
+            fallbackDeCunhaIndices_.push_back(i);
+        }
+    }
+}
+
 void LookupLibrary::loadFromDirectory(const fs::path& libraryDir,
                                       LutFamily family) {
     tables_.clear();
     yReference_.clear();
+    cartechiniIndices_.clear();
+    fallbackDeCunhaIndices_.clear();
+    maxCartechiniEnergyMeV_ = -1.0;
+    activeFamily_ = family;
 
     if (!fs::exists(libraryDir)) {
         throw std::runtime_error(
@@ -150,6 +173,17 @@ void LookupLibrary::loadFromDirectory(const fs::path& libraryDir,
 
     if (family == LutFamily::Cartechini) {
         loadCartechiniDirectory(libraryDir);
+
+        const fs::path fallbackDir =
+            libraryDir.parent_path() / "DeCunha" / "1mm_logarithmic";
+
+        if (!fs::exists(fallbackDir) || !fs::is_directory(fallbackDir)) {
+            throw std::runtime_error(
+                "Missing Cartechini fallback DeCunha directory: " +
+                fallbackDir.string());
+        }
+
+        loadDeCunhaDirectory(fallbackDir);
     } else {
         loadDeCunhaDirectory(libraryDir);
     }
@@ -161,11 +195,52 @@ void LookupLibrary::loadFromDirectory(const fs::path& libraryDir,
 
     std::sort(tables_.begin(), tables_.end(),
               [](const LookupTable& a, const LookupTable& b) {
+                  if (a.monoEnergyMeV() == b.monoEnergyMeV()) {
+                      return static_cast<int>(a.spectrumKind()) <
+                             static_cast<int>(b.spectrumKind());
+                  }
                   return a.monoEnergyMeV() < b.monoEnergyMeV();
               });
 
+    rebuildFamilyIndexCaches();
+
     yReference_ = tables_.front().yLowerEdges();
-    validateConsistentYGrid();
+
+    if (family == LutFamily::DeCunha) {
+        validateConsistentYGrid();
+    }
+}
+
+std::size_t LookupLibrary::findNearestIndexInSubset(
+    double energyMeV,
+    const std::vector<std::size_t>& subset) const {
+    if (subset.empty()) {
+        throw std::runtime_error("Attempted nearest search on empty subset.");
+    }
+
+    auto cmp = [&](std::size_t idx, double value) {
+        return tables_[idx].monoEnergyMeV() < value;
+    };
+
+    auto it = std::lower_bound(subset.begin(), subset.end(), energyMeV, cmp);
+
+    if (it == subset.begin()) {
+        return *it;
+    }
+
+    if (it == subset.end()) {
+        return subset.back();
+    }
+
+    const std::size_t upperTableIdx = *it;
+    const std::size_t lowerTableIdx = *(it - 1);
+
+    const double dLower =
+        std::fabs(tables_[lowerTableIdx].monoEnergyMeV() - energyMeV);
+    const double dUpper =
+        std::fabs(tables_[upperTableIdx].monoEnergyMeV() - energyMeV);
+
+    return (dLower <= dUpper) ? lowerTableIdx : upperTableIdx;
 }
 
 std::size_t LookupLibrary::findNearestIndex(double energyMeV) const {
@@ -174,28 +249,27 @@ std::size_t LookupLibrary::findNearestIndex(double energyMeV) const {
             "LookupLibrary::findNearestIndex called on empty library.");
     }
 
-    auto it = std::lower_bound(
-        tables_.begin(), tables_.end(), energyMeV,
-        [](const LookupTable& table, double value) {
-            return table.monoEnergyMeV() < value;
-        });
+    if (activeFamily_ == LutFamily::Cartechini) {
+        if (energyMeV > maxCartechiniEnergyMeV_) {
+            if (fallbackDeCunhaIndices_.empty()) {
+                throw std::runtime_error(
+                    "Cartechini fallback requested, but no DeCunha fallback tables were loaded.");
+            }
+            return findNearestIndexInSubset(energyMeV, fallbackDeCunhaIndices_);
+        }
 
-    if (it == tables_.begin()) {
-        return 0;
+        if (cartechiniIndices_.empty()) {
+            throw std::runtime_error(
+                "Cartechini library loaded without any Cartechini tables.");
+        }
+        return findNearestIndexInSubset(energyMeV, cartechiniIndices_);
     }
 
-    if (it == tables_.end()) {
-        return tables_.size() - 1;
+    std::vector<std::size_t> allIndices(tables_.size());
+    for (std::size_t i = 0; i < tables_.size(); ++i) {
+        allIndices[i] = i;
     }
-
-    const std::size_t upperIdx =
-        static_cast<std::size_t>(std::distance(tables_.begin(), it));
-    const std::size_t lowerIdx = upperIdx - 1;
-
-    const double dLower = std::fabs(tables_[lowerIdx].monoEnergyMeV() - energyMeV);
-    const double dUpper = std::fabs(tables_[upperIdx].monoEnergyMeV() - energyMeV);
-
-    return (dLower <= dUpper) ? lowerIdx : upperIdx;
+    return findNearestIndexInSubset(energyMeV, allIndices);
 }
 
 const LookupTable& LookupLibrary::findNearest(double energyMeV) const {

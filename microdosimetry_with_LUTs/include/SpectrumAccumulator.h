@@ -1,9 +1,10 @@
 #pragma once
 
-#include <string>
-#include <unordered_map>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
+#include "LookupLibrary.h"
 #include "LookupTable.h"
 
 struct PolySpectrum {
@@ -16,33 +17,51 @@ struct PolySpectrum {
 
 class SpectrumAccumulator {
 public:
-    SpectrumAccumulator();
+    explicit SpectrumAccumulator(
+        const LookupLibrary& library,
+        std::size_t rebinSamples = 1000000,
+        std::uint64_t rebinSeed = 0x5A17C3E4ULL);
 
-    void addContribution(const LookupTable& table, double multiplicity);
+    void addContributionByIndex(std::size_t tableIndex, double multiplicity);
     PolySpectrum finalize() const;
 
 private:
+    struct SourceIntervalData {
+        std::vector<double> lower;
+        std::vector<double> upper;
+        std::vector<double> masses;
+    };
+
     std::vector<double> targetEdges_;
     std::vector<double> yCenters_;
     std::vector<double> binWidths_;
 
-    // Cache of precomputed monoenergetic contribution vectors,
-    // keyed by unique source file path.
-    std::unordered_map<std::string, std::vector<double>> precomputedRawFyCache_;
+    std::vector<std::vector<double>> precomputedRawFyByTable_;
 
-    // Accumulated numerator on the rebinned grid.
     std::vector<double> numerator_;
     double denominator_{0.0};
 
+    std::size_t rebinSamples_{1000000};
+    std::uint64_t rebinSeed_{0x5A17C3E4ULL};
+
     void buildTargetYBins();
 
-    std::vector<double> rebinDiscreteValuesToTargetGrid(
-        const std::vector<double>& srcY,
-        const std::vector<double>& srcValues) const;
+    SourceIntervalData buildSourceIntervals(const LookupTable& table) const;
 
-    std::vector<double> buildPrecomputedRawFy(const LookupTable& table) const;
-    std::vector<double> buildDeCunhaPrecomputedRawFy(
+    std::vector<double> sampleCountsToTargetGrid(
+        const SourceIntervalData& intervals,
+        std::size_t nSamples,
+        std::uint64_t seed) const;
+
+    std::vector<double> rebinCountsToTargetGridStochastic(
+        const LookupTable& table,
+        std::size_t nSamples,
+        std::uint64_t seed) const;
+
+    std::vector<double> rebinCountsToTargetGridDeterministic(
         const LookupTable& table) const;
-    std::vector<double> buildCartechiniPrecomputedRawFy(
-        const LookupTable& table) const;
+
+    std::vector<double> buildPrecomputedRawFy(
+        const LookupTable& table,
+        std::size_t tableIndex) const;
 };

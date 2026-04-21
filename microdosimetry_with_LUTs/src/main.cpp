@@ -1,4 +1,5 @@
-#include <cstddef>
+#include <cctype>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -13,8 +14,32 @@
 
 namespace fs = std::filesystem;
 
-static std::string resolveFolderName(const std::string& voxelSize,
-                                     const std::string& energyGrid) {
+namespace {
+
+std::string toLower(std::string s) {
+    for (char& c : s) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return s;
+}
+
+LutFamily parseLutFamily(const std::string& lutName) {
+    const std::string lower = toLower(lutName);
+
+    if (lower == "cartechini") {
+        return LutFamily::Cartechini;
+    }
+    if (lower == "decunha" || lower == "de_cunha" || lower == "de-cunha") {
+        return LutFamily::DeCunha;
+    }
+
+    throw std::runtime_error(
+        "Unknown LUT family '" + lutName +
+        "'. Expected Cartechini or DeCunha.");
+}
+
+std::string resolveFolderName(const std::string& voxelSize,
+                              const std::string& energyGrid) {
     if (voxelSize == "1mm" && energyGrid == "linear") {
         return "1mm_linear";
     }
@@ -28,65 +53,71 @@ static std::string resolveFolderName(const std::string& voxelSize,
         return "5um_logarithmic";
     }
 
-    throw std::runtime_error(
-        "Invalid voxelSize / energyGrid combination. "
-        "Use voxelSize = 1mm or 5um, and energyGrid = linear or log.");
+    throw std::runtime_error("Invalid voxelSize / energyGrid combination.");
 }
 
-static fs::path resolveLibraryDir(const fs::path& lookupRoot,
-                                  const std::string& lutName,
-                                  LutFamily family,
-                                  const std::string& voxelSize = "",
-                                  const std::string& energyGrid = "") {
+fs::path resolveLibraryDir(const fs::path& lookupRoot,
+                           const std::string& lutName,
+                           LutFamily family,
+                           const std::string& voxelSize,
+                           const std::string& energyGrid) {
     if (family == LutFamily::Cartechini) {
         return lookupRoot / lutName;
     }
 
-    const std::string folderName = resolveFolderName(voxelSize, energyGrid);
-    return lookupRoot / lutName / folderName;
+    return lookupRoot / lutName / resolveFolderName(voxelSize, energyGrid);
 }
 
-static void printUsage(const char* programName) {
+void parseOptionalBuildArgs(int argc,
+                            char* argv[],
+                            int startIndex,
+                            std::size_t& rebinSamples,
+                            std::uint64_t& rebinSeed) {
+    for (int i = startIndex; i < argc; ++i) {
+        const std::string arg = argv[i];
+
+        if (arg == "--rebin-samples") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --rebin-samples");
+            }
+            rebinSamples = static_cast<std::size_t>(std::stoull(argv[++i]));
+            if (rebinSamples == 0) {
+                throw std::runtime_error("--rebin-samples must be > 0");
+            }
+        } else if (arg == "--rebin-seed") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --rebin-seed");
+            }
+            rebinSeed = static_cast<std::uint64_t>(std::stoull(argv[++i]));
+        } else {
+            throw std::runtime_error("Unknown option: " + arg);
+        }
+    }
+}
+
+void printUsage(const char* programName) {
     std::cerr
         << "Usage:\n"
-        << "  DeCunha:\n"
-        << "    " << programName
-        << " test-lookup <lookupRoot> DeCunha <1mm|5um> <linear|log> <energyMeV>\n"
-        << "    " << programName
-        << " audit-phsp <lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir>\n"
-        << "    " << programName
-        << " build-spectrum <lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir>\n"
-        << "\n"
         << "  Cartechini:\n"
         << "    " << programName
-        << " test-lookup <lookupRoot> Cartechini <energyMeV>\n"
+        << " test-lookup <lookupRoot> Cartechini <testEnergyMeV>\n"
         << "    " << programName
         << " audit-phsp <lookupRoot> Cartechini <phspFile> <outputDir>\n"
         << "    " << programName
-        << " build-spectrum <lookupRoot> Cartechini <phspFile> <outputDir>\n";
+        << " build-spectrum <lookupRoot> Cartechini <phspFile> <outputDir>"
+        << " [--rebin-samples N] [--rebin-seed S]\n"
+        << "\n"
+        << "  DeCunha:\n"
+        << "    " << programName
+        << " test-lookup <lookupRoot> DeCunha <1mm|5um> <linear|log> <testEnergyMeV>\n"
+        << "    " << programName
+        << " audit-phsp <lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir>\n"
+        << "    " << programName
+        << " build-spectrum <lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir>"
+        << " [--rebin-samples N] [--rebin-seed S]\n";
 }
 
-static std::string lutFamilyToString(LutFamily family) {
-    switch (family) {
-        case LutFamily::DeCunha:
-            return "DeCunha";
-        case LutFamily::Cartechini:
-            return "Cartechini";
-        default:
-            return "Unknown";
-    }
-}
-
-static std::string spectrumKindToString(LookupSpectrumKind kind) {
-    switch (kind) {
-        case LookupSpectrumKind::DeCunhaRawCounts:
-            return "DeCunhaRawCounts";
-        case LookupSpectrumKind::CartechiniFy:
-            return "CartechiniFy";
-        default:
-            return "Unknown";
-    }
-}
+}  // namespace
 
 int main(int argc, char* argv[]) {
     try {
@@ -99,41 +130,34 @@ int main(int argc, char* argv[]) {
 
         if (mode == "test-lookup") {
             if (argc < 5) {
-                printUsage(argv[0]);
-                throw std::runtime_error("test-lookup requires more arguments.");
+                throw std::runtime_error("Insufficient arguments for test-lookup.");
             }
 
             const fs::path lookupRoot = argv[2];
             const std::string lutName = argv[3];
-            const LutFamily family = LookupLibrary::inferFamily(lutName);
+            const LutFamily family = parseLutFamily(lutName);
 
             fs::path libraryDir;
             double testEnergyMeV = 0.0;
 
-            if (family == LutFamily::DeCunha) {
-                if (argc != 7) {
-                    printUsage(argv[0]);
+            if (family == LutFamily::Cartechini) {
+                if (argc != 5) {
                     throw std::runtime_error(
-                        "test-lookup for DeCunha requires: "
-                        "<lookupRoot> DeCunha <1mm|5um> <linear|log> <energyMeV>");
+                        "Cartechini test-lookup requires: <lookupRoot> Cartechini <testEnergyMeV>");
+                }
+
+                testEnergyMeV = std::stod(argv[4]);
+                libraryDir = resolveLibraryDir(lookupRoot, lutName, family, "", "");
+            } else {
+                if (argc != 7) {
+                    throw std::runtime_error(
+                        "DeCunha test-lookup requires: <lookupRoot> DeCunha <1mm|5um> <linear|log> <testEnergyMeV>");
                 }
 
                 const std::string voxelSize = argv[4];
                 const std::string energyGrid = argv[5];
                 testEnergyMeV = std::stod(argv[6]);
-
-                libraryDir = resolveLibraryDir(
-                    lookupRoot, lutName, family, voxelSize, energyGrid);
-            } else {
-                if (argc != 5) {
-                    printUsage(argv[0]);
-                    throw std::runtime_error(
-                        "test-lookup for Cartechini requires: "
-                        "<lookupRoot> Cartechini <energyMeV>");
-                }
-
-                testEnergyMeV = std::stod(argv[4]);
-                libraryDir = resolveLibraryDir(lookupRoot, lutName, family);
+                libraryDir = resolveLibraryDir(lookupRoot, lutName, family, voxelSize, energyGrid);
             }
 
             if (!fs::exists(libraryDir) || !fs::is_directory(libraryDir)) {
@@ -147,103 +171,83 @@ int main(int argc, char* argv[]) {
             const LookupTable& match = library.findNearest(testEnergyMeV);
 
             std::cout << "Loaded library successfully.\n";
-            std::cout << "LUT family: " << lutFamilyToString(family) << "\n";
             std::cout << "Library folder: " << libraryDir << "\n";
             std::cout << "Number of tables: " << library.size() << "\n";
             std::cout << "Y bins: " << library.yReference().size() << "\n";
             std::cout << "Requested energy: " << testEnergyMeV << " MeV\n";
             std::cout << "Matched energy: " << match.monoEnergyMeV() << " MeV\n";
-            std::cout << "Matched file: " << match.sourceFile() << "\n";
-            std::cout << "Spectrum kind: "
-                      << spectrumKindToString(match.spectrumKind()) << "\n";
-
-            if (match.spectrumKind() == LookupSpectrumKind::DeCunhaRawCounts) {
-                std::cout << "Detected Ncpp: " << match.ncpp() << "\n";
-            } else if (match.spectrumKind() == LookupSpectrumKind::CartechiniFy) {
-                std::cout << "Detected Ncpp: N/A\n";
-            }
-
+            std::cout << "Matched CSV: " << match.sourceFile() << "\n";
+            std::cout << "Detected Ncpp: " << match.ncpp() << "\n";
             return 0;
         }
 
         if (mode == "audit-phsp" || mode == "build-spectrum") {
             if (argc < 6) {
-                printUsage(argv[0]);
-                throw std::runtime_error(mode + " requires more arguments.");
+                throw std::runtime_error("Insufficient arguments.");
             }
 
             const fs::path lookupRoot = argv[2];
             const std::string lutName = argv[3];
-            const LutFamily family = LookupLibrary::inferFamily(lutName);
+            const LutFamily family = parseLutFamily(lutName);
 
-            fs::path primaryLibraryDir;
+            fs::path libraryDir;
             fs::path phspFile;
             fs::path outputDir;
+            int firstOptionalArgIndex = argc;
 
-            if (family == LutFamily::DeCunha) {
-                if (argc != 8) {
-                    printUsage(argv[0]);
-                    throw std::runtime_error(
-                        mode + " for DeCunha requires: "
-                        "<lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir>");
+            if (family == LutFamily::Cartechini) {
+                if (mode == "audit-phsp") {
+                    if (argc != 6) {
+                        throw std::runtime_error(
+                            "Cartechini audit-phsp requires: <lookupRoot> Cartechini <phspFile> <outputDir>");
+                    }
+                } else {
+                    if (argc < 6) {
+                        throw std::runtime_error(
+                            "Cartechini build-spectrum requires: <lookupRoot> Cartechini <phspFile> <outputDir> [--rebin-samples N] [--rebin-seed S]");
+                    }
+                }
+
+                libraryDir = resolveLibraryDir(lookupRoot, lutName, family, "", "");
+                phspFile = argv[4];
+                outputDir = argv[5];
+                firstOptionalArgIndex = 6;
+            } else {
+                if (mode == "audit-phsp") {
+                    if (argc != 8) {
+                        throw std::runtime_error(
+                            "DeCunha audit-phsp requires: <lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir>");
+                    }
+                } else {
+                    if (argc < 8) {
+                        throw std::runtime_error(
+                            "DeCunha build-spectrum requires: <lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir> [--rebin-samples N] [--rebin-seed S]");
+                    }
                 }
 
                 const std::string voxelSize = argv[4];
                 const std::string energyGrid = argv[5];
+                libraryDir = resolveLibraryDir(lookupRoot, lutName, family, voxelSize, energyGrid);
                 phspFile = argv[6];
                 outputDir = argv[7];
-
-                primaryLibraryDir = resolveLibraryDir(
-                    lookupRoot, lutName, family, voxelSize, energyGrid);
-            } else {
-                if (argc != 6) {
-                    printUsage(argv[0]);
-                    throw std::runtime_error(
-                        mode + " for Cartechini requires: "
-                        "<lookupRoot> Cartechini <phspFile> <outputDir>");
-                }
-
-                phspFile = argv[4];
-                outputDir = argv[5];
-                primaryLibraryDir = resolveLibraryDir(lookupRoot, lutName, family);
+                firstOptionalArgIndex = 8;
             }
 
-            if (!fs::exists(primaryLibraryDir) || !fs::is_directory(primaryLibraryDir)) {
+            std::size_t rebinSamples = 1000000;
+            std::uint64_t rebinSeed = 0x5A17C3E4ULL;
+
+            if (mode == "build-spectrum") {
+                parseOptionalBuildArgs(
+                    argc, argv, firstOptionalArgIndex, rebinSamples, rebinSeed);
+            }
+
+            if (!fs::exists(libraryDir) || !fs::is_directory(libraryDir)) {
                 throw std::runtime_error(
-                    "Lookup library folder not found: " + primaryLibraryDir.string());
+                    "Lookup library folder not found: " + libraryDir.string());
             }
 
-            LookupLibrary primaryLibrary;
-            primaryLibrary.loadFromDirectory(primaryLibraryDir, family);
-
-            LookupLibrary fallbackLibrary;
-            fs::path fallbackLibraryDir;
-            bool useFallback = false;
-            double cartechiniMaxEnergy = -1.0;
-
-            if (family == LutFamily::Cartechini) {
-                fallbackLibraryDir = resolveLibraryDir(
-                    lookupRoot, "DeCunha", LutFamily::DeCunha, "1mm", "log");
-
-                if (!fs::exists(fallbackLibraryDir) ||
-                    !fs::is_directory(fallbackLibraryDir)) {
-                    throw std::runtime_error(
-                        "Fallback DeCunha library folder not found: " +
-                        fallbackLibraryDir.string());
-                }
-
-                fallbackLibrary.loadFromDirectory(
-                    fallbackLibraryDir, LutFamily::DeCunha);
-
-                if (primaryLibrary.tables().empty()) {
-                    throw std::runtime_error(
-                        "Cartechini library loaded but contains no tables.");
-                }
-
-                cartechiniMaxEnergy =
-                    primaryLibrary.tables().back().monoEnergyMeV();
-                useFallback = true;
-            }
+            LookupLibrary library;
+            library.loadFromDirectory(libraryDir, family);
 
             PhaseSpaceReader reader;
             const std::vector<ProtonRecord> protons = reader.readProtons(phspFile);
@@ -253,34 +257,17 @@ int main(int argc, char* argv[]) {
             std::vector<ProtonMatchRecord> matches;
             matches.reserve(protons.size());
 
-            SpectrumAccumulator accumulator;
-
-            std::cout << "Phase-space processing started.\n";
-            std::cout << "LUT family: " << lutFamilyToString(family) << "\n";
-            std::cout << "Library folder: " << primaryLibraryDir << "\n";
-
-            if (useFallback) {
-                std::cout
-                    << "WARNING: Cartechini LUT is only available up to "
-                    << cartechiniMaxEnergy
-                    << " MeV. For protons with kinetic energy above this range, "
-                    << "DeCunha 1mm logarithmic LUT will be used as fallback.\n";
-            }
+            SpectrumAccumulator accumulator(library, rebinSamples, rebinSeed);
+            std::vector<std::size_t> matchCounts(library.size(), 0);
 
             for (const auto& proton : protons) {
-                const LookupTable* matchPtr = nullptr;
-                std::string matchedFamily;
+                const std::size_t matchIdx = library.findNearestIndex(proton.energyMeV);
+                const LookupTable& match = library.tables()[matchIdx];
 
-                if (family == LutFamily::Cartechini &&
-                    proton.energyMeV > cartechiniMaxEnergy) {
-                    matchPtr = &fallbackLibrary.findNearest(proton.energyMeV);
-                    matchedFamily = "DeCunha";
-                } else {
-                    matchPtr = &primaryLibrary.findNearest(proton.energyMeV);
-                    matchedFamily = lutFamilyToString(family);
-                }
-
-                const LookupTable& match = *matchPtr;
+                const std::string matchedFamily =
+                    (match.spectrumKind() == LookupSpectrumKind::CartechiniFy)
+                        ? "Cartechini"
+                        : "DeCunha";
 
                 matches.push_back(ProtonMatchRecord{
                     proton.rowIndex,
@@ -293,7 +280,7 @@ int main(int argc, char* argv[]) {
                 });
 
                 if (mode == "build-spectrum") {
-                    accumulator.addContribution(match, 1.0);
+                    matchCounts[matchIdx] += 1;
                 }
             }
 
@@ -301,11 +288,24 @@ int main(int argc, char* argv[]) {
             CsvWriter::writeProtonMatches(matchCsv, matches);
 
             std::cout << "Phase-space processing completed.\n";
+            std::cout << "Library folder: " << libraryDir << "\n";
             std::cout << "Phase-space file: " << phspFile << "\n";
             std::cout << "Protons found: " << protons.size() << "\n";
             std::cout << "Match CSV: " << matchCsv << "\n";
 
             if (mode == "build-spectrum") {
+                std::cout << "Rebin samples per LUT: " << rebinSamples << "\n";
+                std::cout << "Rebin seed: " << rebinSeed << "\n";
+
+                for (std::size_t i = 0; i < matchCounts.size(); ++i) {
+                    if (matchCounts[i] == 0) {
+                        continue;
+                    }
+
+                    accumulator.addContributionByIndex(
+                        i, static_cast<double>(matchCounts[i]));
+                }
+
                 const PolySpectrum spectrum = accumulator.finalize();
                 const fs::path polyCsv = outputDir / "poly_spectrum.csv";
                 CsvWriter::writePolySpectrum(polyCsv, spectrum);
@@ -316,7 +316,6 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        printUsage(argv[0]);
         throw std::runtime_error("Unknown mode: " + mode);
     } catch (const std::exception& e) {
         std::cerr << "ERROR: " << e.what() << "\n";
