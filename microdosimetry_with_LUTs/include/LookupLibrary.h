@@ -54,9 +54,9 @@ private:
     static bool isLookupCsvFile(const std::filesystem::path& filePath);
     static double parseEnergyFromFilename(const std::filesystem::path& filePath);
 
-    static bool isCartechiniEnergyFolder(const std::filesystem::path& folderPath);
-    static double parseEnergyFromCartechiniFolderName(
-        const std::filesystem::path& folderPath);
+    static bool isCartechiniLookupFile(const std::filesystem::path& filePath);
+    static double parseEnergyFromCartechiniFilename(
+        const std::filesystem::path& filePath);
 
     void validateConsistentYGrid() const;
     void rebuildFamilyIndexCaches();

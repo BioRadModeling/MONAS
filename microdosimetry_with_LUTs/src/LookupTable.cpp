@@ -129,13 +129,27 @@ LookupTable LookupTable::loadFromCartechiniYSpec(
             continue;
         }
 
-        std::istringstream iss(line);
         double y = 0.0;
         double fy = 0.0;
 
-        // Numeric data rows begin with y then f(y).
-        // Summary/header rows fail this parse and are skipped.
-        if (!(iss >> y >> fy)) {
+        // Legacy Cartechini text rows begin with y then f(y).
+        {
+            std::istringstream iss(line);
+            if (iss >> y >> fy) {
+                yLowerEdges.push_back(y);
+                fY.push_back(fy);
+                continue;
+            }
+        }
+
+        // Reformatted R8.0 LUTs are CSV rows with y in column 2 and f(y)
+        // currently sourced from the fy_bw column.
+        const auto fields = splitCsvLine(line);
+        if (fields.size() < 6) {
+            continue;
+        }
+
+        if (!tryParseDouble(fields[1], y) || !tryParseDouble(fields[5], fy)) {
             continue;
         }
 

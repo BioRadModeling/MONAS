@@ -56,13 +56,35 @@ std::string resolveFolderName(const std::string& voxelSize,
     throw std::runtime_error("Invalid voxelSize / energyGrid combination.");
 }
 
+std::string resolveCartechiniRadiusFolder(const std::string& radius) {
+    const std::string normalized = toLower(radius);
+
+    if (normalized == "0.5" || normalized == "0.5um" ||
+        normalized == "0.5_um" || normalized == "0.5-um" ||
+        normalized == "r0.5") {
+        return "R0.5";
+    }
+
+    if (normalized == "8" || normalized == "8.0" ||
+        normalized == "8um" || normalized == "8.0um" ||
+        normalized == "8_um" || normalized == "8.0_um" ||
+        normalized == "8-um" || normalized == "8.0-um" ||
+        normalized == "r8" || normalized == "r8.0") {
+        return "R8.0";
+    }
+
+    throw std::runtime_error(
+        "Invalid Cartechini scoring radius '" + radius +
+        "'. Expected 0.5um or 8um.");
+}
+
 fs::path resolveLibraryDir(const fs::path& lookupRoot,
                            const std::string& lutName,
                            LutFamily family,
                            const std::string& voxelSize,
                            const std::string& energyGrid) {
     if (family == LutFamily::Cartechini) {
-        return lookupRoot / lutName;
+        return lookupRoot / lutName / resolveCartechiniRadiusFolder(voxelSize);
     }
 
     return lookupRoot / lutName / resolveFolderName(voxelSize, energyGrid);
@@ -100,11 +122,11 @@ void printUsage(const char* programName) {
         << "Usage:\n"
         << "  Cartechini:\n"
         << "    " << programName
-        << " test-lookup <lookupRoot> Cartechini <testEnergyMeV>\n"
+        << " test-lookup <lookupRoot> Cartechini <0.5um|8um> <testEnergyMeV>\n"
         << "    " << programName
-        << " audit-phsp <lookupRoot> Cartechini <phspFile> <outputDir>\n"
+        << " audit-phsp <lookupRoot> Cartechini <0.5um|8um> <phspFile> <outputDir>\n"
         << "    " << programName
-        << " build-spectrum <lookupRoot> Cartechini <phspFile> <outputDir>"
+        << " build-spectrum <lookupRoot> Cartechini <0.5um|8um> <phspFile> <outputDir>"
         << " [--rebin-samples N] [--rebin-seed S]\n"
         << "\n"
         << "  DeCunha:\n"
@@ -141,13 +163,15 @@ int main(int argc, char* argv[]) {
             double testEnergyMeV = 0.0;
 
             if (family == LutFamily::Cartechini) {
-                if (argc != 5) {
+                if (argc != 6) {
                     throw std::runtime_error(
-                        "Cartechini test-lookup requires: <lookupRoot> Cartechini <testEnergyMeV>");
+                        "Cartechini test-lookup requires: <lookupRoot> Cartechini <0.5um|8um> <testEnergyMeV>");
                 }
 
-                testEnergyMeV = std::stod(argv[4]);
-                libraryDir = resolveLibraryDir(lookupRoot, lutName, family, "", "");
+                const std::string scoringRadius = argv[4];
+                testEnergyMeV = std::stod(argv[5]);
+                libraryDir = resolveLibraryDir(lookupRoot, lutName, family,
+                                              scoringRadius, "");
             } else {
                 if (argc != 7) {
                     throw std::runtime_error(
@@ -205,21 +229,23 @@ int main(int argc, char* argv[]) {
 
             if (family == LutFamily::Cartechini) {
                 if (mode == "audit-phsp") {
-                    if (argc != 6) {
+                    if (argc != 7) {
                         throw std::runtime_error(
-                            "Cartechini audit-phsp requires: <lookupRoot> Cartechini <phspFile> <outputDir>");
+                            "Cartechini audit-phsp requires: <lookupRoot> Cartechini <0.5um|8um> <phspFile> <outputDir>");
                     }
                 } else {
-                    if (argc < 6) {
+                    if (argc < 7) {
                         throw std::runtime_error(
-                            "Cartechini build-spectrum requires: <lookupRoot> Cartechini <phspFile> <outputDir> [--rebin-samples N] [--rebin-seed S]");
+                            "Cartechini build-spectrum requires: <lookupRoot> Cartechini <0.5um|8um> <phspFile> <outputDir> [--rebin-samples N] [--rebin-seed S]");
                     }
                 }
 
-                libraryDir = resolveLibraryDir(lookupRoot, lutName, family, "", "");
-                phspFile = argv[4];
-                outputDir = argv[5];
-                firstOptionalArgIndex = 6;
+                const std::string scoringRadius = argv[4];
+                libraryDir = resolveLibraryDir(lookupRoot, lutName, family,
+                                              scoringRadius, "");
+                phspFile = argv[5];
+                outputDir = argv[6];
+                firstOptionalArgIndex = 7;
             } else {
                 if (mode == "audit-phsp") {
                     if (argc != 8) {

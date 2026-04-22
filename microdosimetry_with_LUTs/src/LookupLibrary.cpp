@@ -58,42 +58,44 @@ double LookupLibrary::parseEnergyFromFilename(const fs::path& filePath) {
     }
 }
 
-bool LookupLibrary::isCartechiniEnergyFolder(const fs::path& folderPath) {
-    if (!fs::is_directory(folderPath)) {
+bool LookupLibrary::isCartechiniLookupFile(const fs::path& filePath) {
+    if (!fs::is_regular_file(filePath)) {
         return false;
     }
 
-    const std::string name = folderPath.filename().string();
-    const std::string prefix = "H_E";
-    const std::string suffix = "_R0.5";
-
-    return name.rfind(prefix, 0) == 0 &&
-           name.size() > prefix.size() + suffix.size() &&
-           name.substr(name.size() - suffix.size()) == suffix;
-}
-
-double LookupLibrary::parseEnergyFromCartechiniFolderName(
-    const fs::path& folderPath) {
-    const std::string name = folderPath.filename().string();
-    const std::string prefix = "H_E";
-    const std::string suffix = "_R0.5";
-
-    if (name.rfind(prefix, 0) != 0 ||
-        name.size() <= prefix.size() + suffix.size() ||
-        name.substr(name.size() - suffix.size()) != suffix) {
-        throw std::runtime_error(
-            "Invalid Cartechini folder name: " + name);
+    if (filePath.extension() != ".txt") {
+        return false;
     }
 
-    const std::string energyStr =
-        name.substr(prefix.size(),
-                    name.size() - prefix.size() - suffix.size());
+    const std::string name = filePath.filename().string();
+    const std::string prefix = "H_E";
+    const std::string radiusMarker = "_R";
+
+    return name.rfind(prefix, 0) == 0 &&
+           name.size() > prefix.size() + radiusMarker.size() + 4 &&
+           name.find(radiusMarker, prefix.size()) != std::string::npos;
+}
+
+double LookupLibrary::parseEnergyFromCartechiniFilename(
+    const fs::path& filePath) {
+    const std::string name = filePath.filename().string();
+    const std::string prefix = "H_E";
+    const std::string radiusMarker = "_R";
+
+    const std::size_t radiusPos = name.find(radiusMarker, prefix.size());
+    if (name.rfind(prefix, 0) != 0 || radiusPos == std::string::npos ||
+        radiusPos <= prefix.size()) {
+        throw std::runtime_error("Invalid Cartechini filename: " + name);
+    }
+
+    const std::string energyStr = name.substr(prefix.size(),
+                                              radiusPos - prefix.size());
 
     try {
         return std::stod(energyStr);
     } catch (...) {
         throw std::runtime_error(
-            "Failed to parse energy from Cartechini folder name: " + name);
+            "Failed to parse energy from Cartechini filename: " + name);
     }
 }
 
@@ -112,24 +114,16 @@ void LookupLibrary::loadDeCunhaDirectory(const fs::path& libraryDir) {
 
 void LookupLibrary::loadCartechiniDirectory(const fs::path& libraryDir) {
     for (const auto& entry : fs::directory_iterator(libraryDir)) {
-        const fs::path folderPath = entry.path();
+        const fs::path filePath = entry.path();
 
-        if (!isCartechiniEnergyFolder(folderPath)) {
+        if (!isCartechiniLookupFile(filePath)) {
             continue;
         }
 
-        const double energyMeV =
-            parseEnergyFromCartechiniFolderName(folderPath);
-
-        const fs::path ySpecPath = folderPath / "ySpecfile.txt";
-        if (!fs::exists(ySpecPath) || !fs::is_regular_file(ySpecPath)) {
-            throw std::runtime_error(
-                "Missing ySpecfile.txt in Cartechini folder: " +
-                folderPath.string());
-        }
+        const double energyMeV = parseEnergyFromCartechiniFilename(filePath);
 
         tables_.push_back(
-            LookupTable::loadFromCartechiniYSpec(ySpecPath, energyMeV));
+            LookupTable::loadFromCartechiniYSpec(filePath, energyMeV));
     }
 }
 
@@ -174,8 +168,14 @@ void LookupLibrary::loadFromDirectory(const fs::path& libraryDir,
     if (family == LutFamily::Cartechini) {
         loadCartechiniDirectory(libraryDir);
 
+        fs::path lookupRoot = libraryDir.parent_path();
+        const std::string folderName = libraryDir.filename().string();
+        if (folderName == "R0.5" || folderName == "R8.0") {
+            lookupRoot = lookupRoot.parent_path();
+        }
+
         const fs::path fallbackDir =
-            libraryDir.parent_path() / "DeCunha" / "1mm_logarithmic";
+            lookupRoot / "DeCunha" / "1mm_logarithmic";
 
         if (!fs::exists(fallbackDir) || !fs::is_directory(fallbackDir)) {
             throw std::runtime_error(
