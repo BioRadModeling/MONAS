@@ -75,7 +75,9 @@ std::string resolveCartechiniRadiusFolder(const std::string& radius) {
 
     throw std::runtime_error(
         "Invalid Cartechini scoring radius '" + radius +
-        "'. Expected 0.5um or 8um.");
+        "'. Expected 0.5um or 8um.\n"
+        "Usage: ./microdosimetry_with_LUTs build-spectrum <lookupRoot> "
+        "Cartechini <0.5um|8um> <phspFile> <outputDir> [options]");
 }
 
 fs::path resolveLibraryDir(const fs::path& lookupRoot,
