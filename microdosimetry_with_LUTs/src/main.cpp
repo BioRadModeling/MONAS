@@ -8,6 +8,8 @@
 
 #include "CsvWriter.h"
 #include "LetCalculator.h"
+#include "MaginiCalculator.h"
+#include "MaginiLookup.h"
 #include "LookupLibrary.h"
 #include "LookupTable.h"
 #include "PhaseSpaceReader.h"
@@ -143,7 +145,11 @@ void printUsage(const char* programName) {
         << "\n"
         << "  LET:\n"
         << "    " << programName
-        << " LET <lookupRoot> <phspFile> <outputDir>\n";
+        << " LET <lookupRoot> <phspFile> <outputDir>\n"
+        << "\n"
+        << "  Magini:\n"
+        << "    " << programName
+        << " Magini <lookupRoot> <phspFile> <outputDir>\n";
 }
 
 }  // namespace
@@ -189,6 +195,45 @@ int main(int argc, char* argv[]) {
             std::cout << "Charged particles found: " << chargedParticles.size() << "\n";
             std::cout << "Output directory: " << outputDir << "\n";
             std::cout << "Element summaries written: " << summaries.size() << "\n";
+            return 0;
+        }
+
+        if (mode == "Magini") {
+            if (argc != 5) {
+                throw std::runtime_error(
+                    "Magini requires: <lookupRoot> <phspFile> <outputDir>");
+            }
+
+            const fs::path lookupRoot = argv[2];
+            const fs::path maginiCsv = lookupRoot / "Magini" / "Magini.csv";
+            const fs::path phspFile = argv[3];
+            const fs::path outputDir = argv[4];
+
+            if (!fs::exists(maginiCsv) || !fs::is_regular_file(maginiCsv)) {
+                throw std::runtime_error(
+                    "Magini lookup CSV not found: " + maginiCsv.string());
+            }
+
+            PhaseSpaceReader reader;
+            const std::vector<ProtonRecord> protons = reader.readProtons(phspFile);
+
+            const MaginiLookup lookup = MaginiLookup::loadFromCsv(maginiCsv);
+
+            MaginiCalculator calculator;
+            const MaginiSummary summary = calculator.calculate(lookup, protons);
+            fs::create_directories(outputDir);
+            const fs::path summaryCsv = outputDir / "magini_summary.csv";
+            CsvWriter::writeMaginiSummary(summaryCsv, summary);
+
+            std::cout << "Magini calculation completed.\n";
+            std::cout << "Phase-space file: " << phspFile << "\n";
+            std::cout << "Output directory: " << outputDir << "\n";
+            std::cout << "Protons found: " << summary.protonCount << "\n";
+            std::cout << "Total proton weight: " << summary.totalProtonWeight << "\n";
+            std::cout << "y_F [keV/um]: " << summary.yFKeVPerUm << "\n";
+            std::cout << "y_D [keV/um]: " << summary.yDKeVPerUm << "\n";
+            std::cout << "y* [keV/um]: " << summary.yStarKeVPerUm << "\n";
+            std::cout << "Magini summary CSV: " << summaryCsv << "\n";
             return 0;
         }
 

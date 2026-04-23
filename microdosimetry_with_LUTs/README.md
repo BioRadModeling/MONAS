@@ -208,7 +208,7 @@ Examples:
 
 ## LET summary calculations
 
-The `calculate-let` mode computes track-averaged LET and dose-averaged LET
+The `LET` mode computes track-averaged LET and dose-averaged LET
 from one phase-space file using the element-specific LET lookup tables in:
 
 ```text
@@ -237,7 +237,7 @@ E(MeV) LET(keV/um)
 The command is independent of the DeCunha and Cartechini spectrum modes:
 
 ```bash
-./microdosimetry_with_LUTs calculate-let ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output
+./microdosimetry_with_LUTs LET ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output
 ```
 
 For each element table, the same charged phase-space rows are processed against
@@ -284,6 +284,67 @@ If a group has no contributing particles, its values are written as `nan`.
 
 ---
 
+## Magini total mean calculations
+
+The `Magini` mode computes the total proton mean quantities `y_F`, `y_D`, and
+`y*` from one phase-space file using the Magini lookup table:
+
+```text
+lookup_tables/Magini/Magini.csv
+```
+
+The Magini CSV is expected to contain four columns:
+
+```csv
+E_i_MeV,y_F_LUT_keV_per_um,y_star_LUT_keV_per_um,y_D_LUT_keV_per_um
+```
+
+The command is:
+
+```bash
+./microdosimetry_with_LUTs Magini ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output
+```
+
+Only proton phase-space rows are used. Each proton row is treated as a weighted
+sample of the phase-space energy distribution, using the weight from column 7
+and the proton kinetic energy from column 6. For each proton energy, the code
+linearly interpolates the Magini LUT quantities on energy. Energies outside the
+Magini LUT range are clamped to the nearest endpoint.
+
+The implemented discrete formulas are:
+
+```text
+y_F    = sum(w_i * y_F_LUT(E_i)) / sum(w_i)
+y_D    = sum(w_i * y_D_LUT(E_i) * y_F_LUT(E_i)) / sum(w_i * y_F_LUT(E_i))
+y_star = sum(w_i * y_star_LUT(E_i) * y_F_LUT(E_i)) / sum(w_i * y_F_LUT(E_i))
+```
+
+where `w_i` is the proton phase-space weight for row `i`.
+
+The output directory receives:
+
+```text
+magini_summary.csv
+```
+
+with this format:
+
+```csv
+proton_count,total_proton_weight,y_F_keV_per_um,y_D_keV_per_um,y_star_keV_per_um,y_D_weighted_numerator,y_star_weighted_numerator
+1, ..., ..., ..., ..., ..., ...
+```
+
+This mode is intended for running the same calculation on phase-space files at
+different depths, for example:
+
+```bash
+./microdosimetry_with_LUTs Magini ../lookup_tables ../input/PhaseSpace_03mm.phsp ../output/depth_03mm
+./microdosimetry_with_LUTs Magini ../lookup_tables ../input/PhaseSpace_10mm.phsp ../output/depth_10mm
+./microdosimetry_with_LUTs Magini ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output/depth_33mm
+```
+
+---
+
 ## Before you start
 
 You need:
@@ -315,7 +376,7 @@ make -j8
 If the build succeeds, it creates an executable named:
 
 ```text
-poly_micro_spectrum
+microdosimetry_with_LUTs
 ```
 
 ---
@@ -520,14 +581,15 @@ Examples:
 
 ## Summary
 
-If you are new and want the minimum set of commands, use these from `poly_micro_spectrum/build`:
+If you are new and want the minimum set of commands, use these from `microdosimetry_with_LUTs/build`:
 
 ```bash
 cmake ..
 make -j8
 ./microdosimetry_with_LUTs test-lookup ../lookup_tables Decunha 1mm log 72.3
 ./microdosimetry_with_LUTs build-spectrum ../lookup_tables Decunha 1mm log ../input/PhaseSpace.phsp ../output
-./microdosimetry_with_LUTs calculate-let ../lookup_tables ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs LET ../lookup_tables ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs Magini ../lookup_tables ../input/PhaseSpace.phsp ../output
 python3 ../macros/plot_spectrum.py ../output/poly_spectrum.csv --x y_keV_per_um --y yd_y --output-dir ../output --title "yd(y) vs y" --logx
 ```
 
@@ -537,4 +599,5 @@ That is enough to:
 - process the phase-space file,
 - create the polyenergetic spectrum,
 - calculate LET summaries,
+- calculate Magini total mean quantities,
 - save the JPEG plot.

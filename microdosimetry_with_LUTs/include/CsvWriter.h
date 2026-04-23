@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "LetCalculator.h"
+#include "MaginiCalculator.h"
 #include "SpectrumAccumulator.h"
 
 struct ProtonMatchRecord {
@@ -38,4 +39,7 @@ public:
     static void writeElementLetSummaries(
         const std::filesystem::path& outputDir,
         const std::vector<ElementLetSummary>& summaries);
+
+    static void writeMaginiSummary(const std::filesystem::path& outPath,
+                                   const MaginiSummary& summary);
 };

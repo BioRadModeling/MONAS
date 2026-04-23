@@ -96,3 +96,24 @@ void CsvWriter::writeElementLetSummaries(
                         summary.records);
     }
 }
+
+void CsvWriter::writeMaginiSummary(const std::filesystem::path& outPath,
+                                   const MaginiSummary& summary) {
+    std::ofstream out(outPath);
+    if (!out) {
+        throw std::runtime_error(
+            "Failed to open Magini summary CSV for writing: " + outPath.string());
+    }
+
+    out << "proton_count,total_proton_weight,"
+        << "y_F_keV_per_um,y_D_keV_per_um,y_star_keV_per_um,"
+        << "y_D_weighted_numerator,y_star_weighted_numerator\n";
+
+    out << summary.protonCount << ','
+        << summary.totalProtonWeight << ','
+        << summary.yFKeVPerUm << ','
+        << summary.yDKeVPerUm << ','
+        << summary.yStarKeVPerUm << ','
+        << summary.yDWeightedNumerator << ','
+        << summary.yStarWeightedNumerator << '\n';
+}
