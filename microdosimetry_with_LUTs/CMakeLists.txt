@@ -10,6 +10,7 @@ add_executable(microdosimetry_with_LUTs
     src/LetAccumulator.cpp
     src/LetCalculator.cpp
     src/LetLookup.cpp
+    src/MaginiLookup.cpp
     src/LookupTable.cpp
     src/LookupLibrary.cpp
     src/PhaseSpaceReader.cpp
