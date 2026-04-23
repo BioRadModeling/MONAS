@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "CsvWriter.h"
+#include "LetCalculator.h"
 #include "LookupLibrary.h"
 #include "LookupTable.h"
 #include "PhaseSpaceReader.h"
@@ -138,7 +139,11 @@ void printUsage(const char* programName) {
         << " audit-phsp <lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir>\n"
         << "    " << programName
         << " build-spectrum <lookupRoot> DeCunha <1mm|5um> <linear|log> <phspFile> <outputDir>"
-        << " [--rebin-samples N] [--rebin-seed S]\n";
+        << " [--rebin-samples N] [--rebin-seed S]\n"
+        << "\n"
+        << "  LET:\n"
+        << "    " << programName
+        << " calculate-let <lookupRoot> <phspFile> <outputDir>\n";
 }
 
 }  // namespace
@@ -151,6 +156,41 @@ int main(int argc, char* argv[]) {
         }
 
         const std::string mode = argv[1];
+
+        if (mode == "calculate-let") {
+            if (argc != 5) {
+                throw std::runtime_error(
+                    "calculate-let requires: <lookupRoot> <phspFile> <outputDir>");
+            }
+
+            const fs::path lookupRoot = argv[2];
+            const fs::path letDirectory = lookupRoot / "LET";
+            const fs::path phspFile = argv[3];
+            const fs::path outputDir = argv[4];
+
+            if (!fs::exists(letDirectory) || !fs::is_directory(letDirectory)) {
+                throw std::runtime_error(
+                    "LET lookup folder not found: " + letDirectory.string());
+            }
+
+            PhaseSpaceReader reader;
+            const std::vector<ChargedParticleRecord> chargedParticles =
+                reader.readChargedParticles(phspFile);
+
+            LetCalculator calculator;
+            const std::vector<ElementLetSummary> summaries =
+                calculator.calculateByElement(letDirectory, chargedParticles);
+
+            CsvWriter::writeElementLetSummaries(outputDir, summaries);
+
+            std::cout << "LET calculation completed.\n";
+            std::cout << "LET folder: " << letDirectory << "\n";
+            std::cout << "Phase-space file: " << phspFile << "\n";
+            std::cout << "Charged particles found: " << chargedParticles.size() << "\n";
+            std::cout << "Output directory: " << outputDir << "\n";
+            std::cout << "Element summaries written: " << summaries.size() << "\n";
+            return 0;
+        }
 
         if (mode == "test-lookup") {
             if (argc < 5) {

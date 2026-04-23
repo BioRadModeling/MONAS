@@ -1,12 +1,39 @@
 #include "PhaseSpaceReader.h"
 
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-std::vector<ProtonRecord> PhaseSpaceReader::readProtons(
+namespace {
+
+bool isChargedParticlePdg(int pdgCode) {
+    const int absPdg = std::abs(pdgCode);
+
+    // Charged leptons.
+    if (absPdg == 11 || absPdg == 13 || absPdg == 15) {
+        return true;
+    }
+
+    // Common charged hadrons found in phase-space files.
+    if (absPdg == 211 || absPdg == 321 || absPdg == 2212) {
+        return true;
+    }
+
+    // Ions use the PDG nuclear code 10LZZZAAAI. A nonzero Z is charged.
+    if (absPdg >= 1000000000) {
+        const int z = (absPdg / 10000) % 1000;
+        return z > 0;
+    }
+
+    return false;
+}
+
+}  // namespace
+
+std::vector<ChargedParticleRecord> PhaseSpaceReader::readChargedParticles(
     const std::filesystem::path& phspPath) const {
 
     std::ifstream in(phspPath);
@@ -14,7 +41,7 @@ std::vector<ProtonRecord> PhaseSpaceReader::readProtons(
         throw std::runtime_error("Failed to open phase space file: " + phspPath.string());
     }
 
-    std::vector<ProtonRecord> protons;
+    std::vector<ChargedParticleRecord> chargedParticles;
     std::string line;
     std::size_t rowIndex = 0;
 
@@ -43,8 +70,8 @@ std::vector<ProtonRecord> PhaseSpaceReader::readProtons(
             const double weight    = std::stod(fields[6]);   // column 7
             const int pdgCode      = static_cast<int>(std::stod(fields[7])); // column 8
 
-            if (pdgCode == 2212) {
-                protons.push_back(ProtonRecord{
+            if (isChargedParticlePdg(pdgCode)) {
+                chargedParticles.push_back(ChargedParticleRecord{
                     rowIndex,
                     energyMeV,
                     weight,
@@ -54,6 +81,29 @@ std::vector<ProtonRecord> PhaseSpaceReader::readProtons(
         } catch (...) {
             // skip malformed rows
             continue;
+        }
+    }
+
+    return chargedParticles;
+}
+
+std::vector<ProtonRecord> PhaseSpaceReader::readProtons(
+    const std::filesystem::path& phspPath) const {
+
+    const std::vector<ChargedParticleRecord> chargedParticles =
+        readChargedParticles(phspPath);
+
+    std::vector<ProtonRecord> protons;
+    protons.reserve(chargedParticles.size());
+
+    for (const auto& particle : chargedParticles) {
+        if (particle.pdgCode == 2212) {
+            protons.push_back(ProtonRecord{
+                particle.rowIndex,
+                particle.energyMeV,
+                particle.weight,
+                particle.pdgCode
+            });
         }
     }
 

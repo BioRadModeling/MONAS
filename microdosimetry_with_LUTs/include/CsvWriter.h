@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "LetCalculator.h"
 #include "SpectrumAccumulator.h"
 
 struct ProtonMatchRecord {
@@ -30,4 +31,11 @@ public:
 
     static void writePolySpectrum(const std::filesystem::path& outPath,
                                   const PolySpectrum& spectrum);
+
+    static void writeLetSummary(const std::filesystem::path& outPath,
+                                const std::vector<LetSummaryRecord>& records);
+
+    static void writeElementLetSummaries(
+        const std::filesystem::path& outputDir,
+        const std::vector<ElementLetSummary>& summaries);
 };

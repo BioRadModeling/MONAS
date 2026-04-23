@@ -206,6 +206,84 @@ Examples:
 
 ---
 
+## LET summary calculations
+
+The `calculate-let` mode computes track-averaged LET and dose-averaged LET
+from one phase-space file using the element-specific LET lookup tables in:
+
+```text
+lookup_tables/LET/
+```
+
+Expected LET files are:
+
+```text
+H_water.txt
+He_water.txt
+Li_water.txt
+Be_water.txt
+B_water.txt
+C_water.txt
+N_water.txt
+O_water.txt
+```
+
+Each file is interpreted as:
+
+```text
+E(MeV) LET(keV/um)
+```
+
+The command is independent of the DeCunha and Cartechini spectrum modes:
+
+```bash
+./microdosimetry_with_LUTs calculate-let ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output
+```
+
+For each element table, the same charged phase-space rows are processed against
+that element's `LET(E)` curve. Neutral particles are ignored. The three output
+groups are:
+
+- `all_charged`: every charged phase-space row accepted by the LET reader
+- `protons`: charged rows with PDG code `2212`
+- `other_charged`: accepted charged rows with PDG code other than `2212`
+
+The output directory receives one CSV per element:
+
+```text
+let_summary_H.csv
+let_summary_He.csv
+let_summary_Li.csv
+let_summary_Be.csv
+let_summary_B.csv
+let_summary_C.csv
+let_summary_N.csv
+let_summary_O.csv
+```
+
+Each file has this format:
+
+```csv
+group,track_averaged_LET_keV_per_um,dose_averaged_LET_keV_per_um
+all_charged,...
+protons,...
+other_charged,...
+```
+
+The averages are calculated as:
+
+```text
+track_averaged_LET = sum(w * LET) / sum(w)
+dose_averaged_LET  = sum(w * LET * LET) / sum(w * LET)
+```
+
+where `w` is the phase-space weight from column 7 and `LET` is linearly
+interpolated from the selected element table at the particle energy from column
+6. Energies outside the LET table range are clamped to the nearest endpoint.
+If a group has no contributing particles, its values are written as `nan`.
+
+---
+
 ## Before you start
 
 You need:
@@ -449,6 +527,7 @@ cmake ..
 make -j8
 ./microdosimetry_with_LUTs test-lookup ../lookup_tables Decunha 1mm log 72.3
 ./microdosimetry_with_LUTs build-spectrum ../lookup_tables Decunha 1mm log ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs calculate-let ../lookup_tables ../input/PhaseSpace.phsp ../output
 python3 ../macros/plot_spectrum.py ../output/poly_spectrum.csv --x y_keV_per_um --y yd_y --output-dir ../output --title "yd(y) vs y" --logx
 ```
 
@@ -457,4 +536,5 @@ That is enough to:
 - load the lookup library,
 - process the phase-space file,
 - create the polyenergetic spectrum,
+- calculate LET summaries,
 - save the JPEG plot.

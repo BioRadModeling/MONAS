@@ -1,7 +1,17 @@
 #include "CsvWriter.h"
 
+#include <filesystem>
 #include <fstream>
 #include <stdexcept>
+
+namespace {
+
+std::filesystem::path letSummaryPath(const std::filesystem::path& outputDir,
+                                     const std::string& element) {
+    return outputDir / ("let_summary_" + element + ".csv");
+}
+
+}  // namespace
 
 void CsvWriter::writeProtonMatches(
     const std::filesystem::path& outPath,
@@ -52,5 +62,37 @@ void CsvWriter::writePolySpectrum(const std::filesystem::path& outPath,
             << spectrum.yf[i] << ','
             << spectrum.d[i] << ','
             << spectrum.yd[i] << '\n';
+    }
+}
+
+void CsvWriter::writeLetSummary(
+    const std::filesystem::path& outPath,
+    const std::vector<LetSummaryRecord>& records) {
+
+    std::ofstream out(outPath);
+    if (!out) {
+        throw std::runtime_error(
+            "Failed to open LET summary CSV for writing: " + outPath.string());
+    }
+
+    out << "group,track_averaged_LET_keV_per_um,"
+        << "dose_averaged_LET_keV_per_um\n";
+
+    for (const auto& record : records) {
+        out << record.group << ','
+            << record.trackAveragedLetKeVPerUm << ','
+            << record.doseAveragedLetKeVPerUm << '\n';
+    }
+}
+
+void CsvWriter::writeElementLetSummaries(
+    const std::filesystem::path& outputDir,
+    const std::vector<ElementLetSummary>& summaries) {
+
+    std::filesystem::create_directories(outputDir);
+
+    for (const auto& summary : summaries) {
+        writeLetSummary(letSummaryPath(outputDir, summary.element),
+                        summary.records);
     }
 }
