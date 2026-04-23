@@ -143,7 +143,7 @@ void printUsage(const char* programName) {
         << "\n"
         << "  LET:\n"
         << "    " << programName
-        << " calculate-let <lookupRoot> <phspFile> <outputDir>\n";
+        << " LET <lookupRoot> <phspFile> <outputDir>\n";
 }
 
 }  // namespace
@@ -157,10 +157,10 @@ int main(int argc, char* argv[]) {
 
         const std::string mode = argv[1];
 
-        if (mode == "calculate-let") {
+        if (mode == "LET") {
             if (argc != 5) {
                 throw std::runtime_error(
-                    "calculate-let requires: <lookupRoot> <phspFile> <outputDir>");
+                    "LET requires: <lookupRoot> <phspFile> <outputDir>");
             }
 
             const fs::path lookupRoot = argv[2];
