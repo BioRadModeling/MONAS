@@ -7,6 +7,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(microdosimetry_with_LUTs
     src/main.cpp
+    src/InaniwaCalculator.cpp
+    src/InaniwaLookup.cpp
     src/LetAccumulator.cpp
     src/LetCalculator.cpp
     src/LetLookup.cpp

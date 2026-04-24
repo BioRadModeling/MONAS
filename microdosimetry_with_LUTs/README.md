@@ -345,6 +345,70 @@ different depths, for example:
 
 ---
 
+## Inaniwa total mean calculations
+
+The `Inaniwa` mode computes total mean quantities from one phase-space file
+using the ten Inaniwa lookup tables:
+
+```text
+lookup_tables/Inaniwa/Zp_1.csv
+...
+lookup_tables/Inaniwa/Zp_10.csv
+```
+
+Each Inaniwa CSV is expected to contain four columns:
+
+```csv
+E_i_MeV_per_u,z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy
+```
+
+The command is:
+
+```bash
+./microdosimetry_with_LUTs Inaniwa ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output
+```
+
+All charged phase-space rows are reused for each of the ten LUT atomic-number
+tables. The implementation does not choose a table from the phase-space row's
+particle identity. Instead, it runs the same weighted-average calculation ten
+times, once with each `Zp_1` through `Zp_10` table.
+
+For this mode, the implementation uses:
+
+```text
+e_k := KE_k
+```
+
+where `KE_k` is the row kinetic energy from phase-space column 6. The same
+kinetic energy value is also used as the LUT query energy. Energies outside an
+Inaniwa table range are clamped to the nearest endpoint.
+
+For each LUT atomic number `Z = 1..10`, the implemented discrete formulas are:
+
+```text
+z_d,D_mean(Z)     = sum(KE_k * z_d,D_LUT(KE_k, Z))    / sum(KE_k)
+z*_d,D_mean(Z)    = sum(KE_k * z*_d,D_LUT(KE_k, Z))   / sum(KE_k)
+z_n,D_mean(Z)     = sum(KE_k * z_n,D_LUT(KE_k, Z))    / sum(KE_k)
+```
+
+The output directory receives:
+
+```text
+inaniwa_summary.csv
+```
+
+with this format:
+
+```csv
+atomic_number,z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy
+1,...,...,...
+2,...,...,...
+...
+10,...,...,...
+```
+
+---
+
 ## Before you start
 
 You need:
@@ -590,6 +654,7 @@ make -j8
 ./microdosimetry_with_LUTs build-spectrum ../lookup_tables Decunha 1mm log ../input/PhaseSpace.phsp ../output
 ./microdosimetry_with_LUTs LET ../lookup_tables ../input/PhaseSpace.phsp ../output
 ./microdosimetry_with_LUTs Magini ../lookup_tables ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs Inaniwa ../lookup_tables ../input/PhaseSpace.phsp ../output
 python3 ../macros/plot_spectrum.py ../output/poly_spectrum.csv --x y_keV_per_um --y yd_y --output-dir ../output --title "yd(y) vs y" --logx
 ```
 
@@ -600,4 +665,5 @@ That is enough to:
 - create the polyenergetic spectrum,
 - calculate LET summaries,
 - calculate Magini total mean quantities,
+- calculate Inaniwa total mean quantities,
 - save the JPEG plot.

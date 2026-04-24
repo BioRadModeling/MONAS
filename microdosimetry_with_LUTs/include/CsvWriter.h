@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "InaniwaCalculator.h"
 #include "LetCalculator.h"
 #include "MaginiCalculator.h"
 #include "SpectrumAccumulator.h"
@@ -39,6 +40,10 @@ public:
     static void writeElementLetSummaries(
         const std::filesystem::path& outputDir,
         const std::vector<ElementLetSummary>& summaries);
+
+    static void writeInaniwaSummary(
+        const std::filesystem::path& outPath,
+        const std::vector<InaniwaSummaryRecord>& summaries);
 
     static void writeMaginiSummary(const std::filesystem::path& outPath,
                                    const MaginiSummary& summary);

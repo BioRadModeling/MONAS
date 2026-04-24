@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "CsvWriter.h"
+#include "InaniwaCalculator.h"
+#include "InaniwaLookup.h"
 #include "LetCalculator.h"
 #include "MaginiCalculator.h"
 #include "MaginiLookup.h"
@@ -149,7 +151,11 @@ void printUsage(const char* programName) {
         << "\n"
         << "  Magini:\n"
         << "    " << programName
-        << " Magini <lookupRoot> <phspFile> <outputDir>\n";
+        << " Magini <lookupRoot> <phspFile> <outputDir>\n"
+        << "\n"
+        << "  Inaniwa:\n"
+        << "    " << programName
+        << " Inaniwa <lookupRoot> <phspFile> <outputDir>\n";
 }
 
 }  // namespace
@@ -234,6 +240,46 @@ int main(int argc, char* argv[]) {
             std::cout << "y_D [keV/um]: " << summary.yDKeVPerUm << "\n";
             std::cout << "y* [keV/um]: " << summary.yStarKeVPerUm << "\n";
             std::cout << "Magini summary CSV: " << summaryCsv << "\n";
+            return 0;
+        }
+
+        if (mode == "Inaniwa") {
+            if (argc != 5) {
+                throw std::runtime_error(
+                    "Inaniwa requires: <lookupRoot> <phspFile> <outputDir>");
+            }
+
+            const fs::path lookupRoot = argv[2];
+            const fs::path inaniwaDirectory = lookupRoot / "Inaniwa";
+            const fs::path phspFile = argv[3];
+            const fs::path outputDir = argv[4];
+
+            if (!fs::exists(inaniwaDirectory) || !fs::is_directory(inaniwaDirectory)) {
+                throw std::runtime_error(
+                    "Inaniwa lookup folder not found: " + inaniwaDirectory.string());
+            }
+
+            PhaseSpaceReader reader;
+            const std::vector<ChargedParticleRecord> chargedParticles =
+                reader.readChargedParticles(phspFile);
+
+            const InaniwaLookup lookup =
+                InaniwaLookup::loadFromDirectory(inaniwaDirectory);
+
+            InaniwaCalculator calculator;
+            const std::vector<InaniwaSummaryRecord> summaries =
+                calculator.calculate(lookup, chargedParticles);
+
+            fs::create_directories(outputDir);
+            const fs::path summaryCsv = outputDir / "inaniwa_summary.csv";
+            CsvWriter::writeInaniwaSummary(summaryCsv, summaries);
+
+            std::cout << "Inaniwa calculation completed.\n";
+            std::cout << "Inaniwa folder: " << inaniwaDirectory << "\n";
+            std::cout << "Phase-space file: " << phspFile << "\n";
+            std::cout << "Charged particles found: " << chargedParticles.size() << "\n";
+            std::cout << "Atomic-number summaries written: " << summaries.size() << "\n";
+            std::cout << "Inaniwa summary CSV: " << summaryCsv << "\n";
             return 0;
         }
 
