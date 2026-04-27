@@ -78,7 +78,7 @@ void CsvWriter::writeLetSummary(
 
 void CsvWriter::writeInaniwaSummary(
     const std::filesystem::path& outPath,
-    const std::vector<InaniwaSummaryRecord>& summaries) {
+    const InaniwaSummary& summary) {
 
     std::ofstream out(outPath);
     if (!out) {
@@ -86,14 +86,10 @@ void CsvWriter::writeInaniwaSummary(
             "Failed to open Inaniwa summary CSV for writing: " + outPath.string());
     }
 
-    out << "atomic_number,z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy\n";
-
-    for (const auto& summary : summaries) {
-        out << summary.atomicNumber << ','
-            << summary.zdDMeanGy << ','
-            << summary.zdDStarMeanGy << ','
-            << summary.znDMeanGy << '\n';
-    }
+    out << "z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy\n";
+    out << summary.zdDMeanGy << ','
+        << summary.zdDStarMeanGy << ','
+        << summary.znDMeanGy << '\n';
 }
 
 void CsvWriter::writeMaginiSummary(const std::filesystem::path& outPath,

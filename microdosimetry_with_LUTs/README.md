@@ -215,7 +215,7 @@ from one phase-space file using the element-specific LET lookup tables in:
 lookup_tables/LET/
 ```
 
-Expected LET files are:
+Currently used LET files are:
 
 ```text
 H_water.txt
@@ -240,34 +240,48 @@ The command is independent of the DeCunha and Cartechini spectrum modes:
 ./microdosimetry_with_LUTs LET ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output
 ```
 
-For each element table, the same charged phase-space rows are processed against
-that element's `LET(E)` curve. Neutral particles are ignored. The three output
-groups are:
+The phase-space file is read row by row. For each charged particle row, the
+code:
 
-- `all_charged`: every charged phase-space row accepted by the LET reader
-- `protons`: charged rows with PDG code `2212`
-- `other_charged`: accepted charged rows with PDG code other than `2212`
+1. reads the particle PDG code from column 8,
+2. maps that PDG code to a beam-element LET family,
+3. loads the matching element LUT from `lookup_tables/LET`,
+4. interpolates `LET(E)` at the particle kinetic energy from column 6,
+5. accumulates the LET contribution using the phase-space weight from column 7.
 
-The output directory receives one CSV per element:
+Neutral particles are ignored. Charged particles whose PDG code is not mapped
+to a supported LET family are also ignored.
+
+The current PDG-to-element family mapping is:
+
+- `H`: `2212`, `1000010010`, `1000010020`, `1000010030`
+- `He`: `1000020030`, `1000020040`
+- `Li`: `1000030060`, `1000030070`
+- `Be`: `1000040070`, `1000040090`
+- `B`: `1000050100`, `1000050110`
+- `C`: `1000060110`, `1000060120`, `1000060130`
+- `N`: `1000070130`, `1000070140`, `1000070150`
+- `O`: `1000080150`, `1000080160`
+- `F`: `1000090190`
+- `Ne`: `1000100200`, `1000100220`
+
+Only the families with available LUT files are actually used. At the moment,
+the lookup folder contains LUTs for `H`, `He`, `Li`, `Be`, `B`, `C`, `N`, and
+`O`. If a PDG code maps to `F` or `Ne` before those LUT files are added, that
+row is skipped.
+
+The output directory receives one summary CSV:
 
 ```text
-let_summary_H.csv
-let_summary_He.csv
-let_summary_Li.csv
-let_summary_Be.csv
-let_summary_B.csv
-let_summary_C.csv
-let_summary_N.csv
-let_summary_O.csv
+let_summary.csv
 ```
 
-Each file has this format:
+The file has exactly two rows:
 
 ```csv
 group,track_averaged_LET_keV_per_um,dose_averaged_LET_keV_per_um
-all_charged,...
 protons,...
-other_charged,...
+all_charged,...
 ```
 
 The averages are calculated as:
@@ -278,8 +292,16 @@ dose_averaged_LET  = sum(w * LET * LET) / sum(w * LET)
 ```
 
 where `w` is the phase-space weight from column 7 and `LET` is linearly
-interpolated from the selected element table at the particle energy from column
-6. Energies outside the LET table range are clamped to the nearest endpoint.
+interpolated from the matched element table at the particle energy from column
+6. Energies outside the selected LET table range are clamped to the nearest
+endpoint.
+
+The two groups mean:
+
+- `protons`: only rows with PDG `2212` or `1000010010`
+- `all_charged`: all supported charged rows that matched one of the mapped LET
+  families above
+
 If a group has no contributing particles, its values are written as `nan`.
 
 ---
@@ -368,10 +390,16 @@ The command is:
 ./microdosimetry_with_LUTs Inaniwa ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output
 ```
 
-All charged phase-space rows are reused for each of the ten LUT atomic-number
-tables. The implementation does not choose a table from the phase-space row's
-particle identity. Instead, it runs the same weighted-average calculation ten
-times, once with each `Zp_1` through `Zp_10` table.
+Each charged phase-space row is matched to an Inaniwa table by decoding the
+particle PDG code to its ion atomic number `Z`. Rows with:
+
+- proton / hydrogen-family ions use `Zp_1.csv`
+- helium-family ions use `Zp_2.csv`
+- ...
+- neon-family ions use `Zp_10.csv`
+
+Rows that do not decode to supported ion identities with `Z = 1..10` are
+ignored by this mode.
 
 For this mode, the implementation uses:
 
@@ -379,17 +407,25 @@ For this mode, the implementation uses:
 e_k := KE_k
 ```
 
-where `KE_k` is the row kinetic energy from phase-space column 6. The same
-kinetic energy value is also used as the LUT query energy. Energies outside an
-Inaniwa table range are clamped to the nearest endpoint.
-
-For each LUT atomic number `Z = 1..10`, the implemented discrete formulas are:
+where `KE_k` is the row kinetic energy from phase-space column 6. The LUT query
+energy is converted to the Inaniwa table axis with:
 
 ```text
-z_d,D_mean(Z)     = sum(KE_k * z_d,D_LUT(KE_k, Z))    / sum(KE_k)
-z*_d,D_mean(Z)    = sum(KE_k * z*_d,D_LUT(KE_k, Z))   / sum(KE_k)
-z_n,D_mean(Z)     = sum(KE_k * z_n,D_LUT(KE_k, Z))    / sum(KE_k)
+E_i = KE_k / A_k   [MeV/u]
 ```
+
+where `A_k` is the decoded mass number of the ion. Energies outside an Inaniwa
+table range are clamped to the nearest endpoint.
+
+The implemented discrete formulas are:
+
+```text
+z_d_D_mean_Gy      = sum(KE_k * z_d,D_LUT(KE_k / A_k, Z_k))   / sum(KE_k)
+z_d_D_star_mean_Gy = sum(KE_k * z*_d,D_LUT(KE_k / A_k, Z_k))  / sum(KE_k)
+z_n_D_mean_Gy      = sum(KE_k * z_n,D_LUT(KE_k / A_k, Z_k))   / sum(KE_k)
+```
+
+where `Z_k` is the ion atomic number decoded from the row PDG code.
 
 The output directory receives:
 
@@ -400,11 +436,8 @@ inaniwa_summary.csv
 with this format:
 
 ```csv
-atomic_number,z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy
-1,...,...,...
-2,...,...,...
-...
-10,...,...,...
+z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy
+...,...,...
 ```
 
 ---

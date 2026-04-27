@@ -6,9 +6,8 @@
 #include "InaniwaLookup.h"
 #include "PhaseSpaceReader.h"
 
-struct InaniwaSummaryRecord {
-    int atomicNumber{0};
-    std::size_t particleCount{0};
+struct InaniwaSummary {
+    std::size_t matchedParticleCount{0};
     double totalEventEnergyMeV{0.0};
     double zdDMeanGy{0.0};
     double zdDStarMeanGy{0.0};
@@ -17,11 +16,11 @@ struct InaniwaSummaryRecord {
 
 class InaniwaCalculator {
 public:
-    // The Inaniwa totals are evaluated independently for each LUT atomic
-    // number. The same charged phase-space rows are reused for every Z=1..10
-    // table, with e_k := KE from the phase space and the LUT query energy
-    // taken directly from the row kinetic energy.
-    std::vector<InaniwaSummaryRecord> calculate(
+    // The Inaniwa totals are evaluated over all charged phase-space rows that
+    // decode to supported ion families with Z=1..10. Each row selects its LUT
+    // table from the decoded atomic number, uses e_k := KE from the phase
+    // space, and queries the LUT on the MeV/u axis using KE/A.
+    InaniwaSummary calculate(
         const InaniwaLookup& lookup,
         const std::vector<ChargedParticleRecord>& chargedParticles) const;
 };

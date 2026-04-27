@@ -39,7 +39,7 @@ public:
 
     static void writeInaniwaSummary(
         const std::filesystem::path& outPath,
-        const std::vector<InaniwaSummaryRecord>& summaries);
+        const InaniwaSummary& summary);
 
     static void writeMaginiSummary(const std::filesystem::path& outPath,
                                    const MaginiSummary& summary);

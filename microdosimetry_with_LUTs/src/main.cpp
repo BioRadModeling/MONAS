@@ -270,18 +270,18 @@ int main(int argc, char* argv[]) {
                 InaniwaLookup::loadFromDirectory(inaniwaDirectory);
 
             InaniwaCalculator calculator;
-            const std::vector<InaniwaSummaryRecord> summaries =
+            const InaniwaSummary summary =
                 calculator.calculate(lookup, chargedParticles);
 
             fs::create_directories(outputDir);
             const fs::path summaryCsv = outputDir / "inaniwa_summary.csv";
-            CsvWriter::writeInaniwaSummary(summaryCsv, summaries);
+            CsvWriter::writeInaniwaSummary(summaryCsv, summary);
 
             std::cout << "Inaniwa calculation completed.\n";
             std::cout << "Inaniwa folder: " << inaniwaDirectory << "\n";
             std::cout << "Phase-space file: " << phspFile << "\n";
             std::cout << "Charged particles found: " << chargedParticles.size() << "\n";
-            std::cout << "Atomic-number summaries written: " << summaries.size() << "\n";
+            std::cout << "Matched ion rows used: " << summary.matchedParticleCount << "\n";
             std::cout << "Inaniwa summary CSV: " << summaryCsv << "\n";
             return 0;
         }

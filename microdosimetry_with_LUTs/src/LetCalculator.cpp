@@ -94,6 +94,11 @@ std::optional<std::string> LetCalculator::lutElementForPdg(int pdgCode) {
         case 1000080150:
         case 1000080160:
             return std::string("O");
+        case 1000090190:
+            return std::string("F");
+        case 1000100200:
+        case 1000100220:
+            return std::string("Ne");
         default:
             return std::nullopt;
     }
