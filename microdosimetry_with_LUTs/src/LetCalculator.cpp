@@ -68,19 +68,30 @@ std::optional<std::string> LetCalculator::lutElementForPdg(int pdgCode) {
     switch (pdgCode) {
         case protonPdgCode:
         case protonIonPdgCode:
+        case 1000010020:
+        case 1000010030:
             return std::string("H");
+        case 1000020030:
         case 1000020040:
             return std::string("He");
+        case 1000030060:
         case 1000030070:
             return std::string("Li");
+        case 1000040070:
         case 1000040090:
             return std::string("Be");
+        case 1000050100:
         case 1000050110:
             return std::string("B");
+        case 1000060110:
         case 1000060120:
+        case 1000060130:
             return std::string("C");
+        case 1000070130:
         case 1000070140:
+        case 1000070150:
             return std::string("N");
+        case 1000080150:
         case 1000080160:
             return std::string("O");
         default:
