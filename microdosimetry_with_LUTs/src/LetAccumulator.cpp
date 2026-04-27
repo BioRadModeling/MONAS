@@ -9,14 +9,11 @@ void LetAccumulator::add(LetGroup group,
     Bucket* bucket = nullptr;
 
     switch (group) {
-        case LetGroup::AllCharged:
-            bucket = &allCharged_;
-            break;
         case LetGroup::Protons:
             bucket = &protons_;
             break;
-        case LetGroup::OtherCharged:
-            bucket = &otherCharged_;
+        case LetGroup::AllCharged:
+            bucket = &allCharged_;
             break;
     }
 
@@ -32,9 +29,8 @@ void LetAccumulator::add(LetGroup group,
 
 std::vector<LetSummaryRecord> LetAccumulator::summarize() const {
     return {
-        summarizeBucket("all_charged", allCharged_),
         summarizeBucket("protons", protons_),
-        summarizeBucket("other_charged", otherCharged_)
+        summarizeBucket("all_charged", allCharged_)
     };
 }
 

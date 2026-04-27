@@ -4,9 +4,8 @@
 #include <vector>
 
 enum class LetGroup {
-    AllCharged,
     Protons,
-    OtherCharged
+    AllCharged
 };
 
 struct LetSummaryRecord {
@@ -28,9 +27,8 @@ private:
         double doseDenominator{0.0};
     };
 
-    Bucket allCharged_;
     Bucket protons_;
-    Bucket otherCharged_;
+    Bucket allCharged_;
 
     static LetSummaryRecord summarizeBucket(const std::string& name,
                                             const Bucket& bucket);

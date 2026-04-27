@@ -1,26 +1,26 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "LetAccumulator.h"
 #include "PhaseSpaceReader.h"
 
-struct ElementLetSummary {
-    std::string element;
+struct LetCalculationResult {
     std::vector<LetSummaryRecord> records;
+    std::size_t matchedParticleCount{0};
 };
 
 class LetCalculator {
 public:
-    static const std::vector<std::string>& supportedElements();
-
-    std::vector<ElementLetSummary> calculateByElement(
+    LetCalculationResult calculate(
         const std::filesystem::path& letDirectory,
         const std::vector<ChargedParticleRecord>& chargedParticles) const;
 
 private:
+    static std::optional<std::string> lutElementForPdg(int pdgCode);
     static void addParticleToAccumulator(LetAccumulator& accumulator,
                                          const ChargedParticleRecord& particle,
                                          double letKeVPerUm);

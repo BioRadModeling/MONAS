@@ -37,10 +37,6 @@ public:
     static void writeLetSummary(const std::filesystem::path& outPath,
                                 const std::vector<LetSummaryRecord>& records);
 
-    static void writeElementLetSummaries(
-        const std::filesystem::path& outputDir,
-        const std::vector<ElementLetSummary>& summaries);
-
     static void writeInaniwaSummary(
         const std::filesystem::path& outPath,
         const std::vector<InaniwaSummaryRecord>& summaries);

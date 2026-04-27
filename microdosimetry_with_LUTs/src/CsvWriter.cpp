@@ -4,15 +4,6 @@
 #include <fstream>
 #include <stdexcept>
 
-namespace {
-
-std::filesystem::path letSummaryPath(const std::filesystem::path& outputDir,
-                                     const std::string& element) {
-    return outputDir / ("let_summary_" + element + ".csv");
-}
-
-}  // namespace
-
 void CsvWriter::writeProtonMatches(
     const std::filesystem::path& outPath,
     const std::vector<ProtonMatchRecord>& matches) {
@@ -82,18 +73,6 @@ void CsvWriter::writeLetSummary(
         out << record.group << ','
             << record.trackAveragedLetKeVPerUm << ','
             << record.doseAveragedLetKeVPerUm << '\n';
-    }
-}
-
-void CsvWriter::writeElementLetSummaries(
-    const std::filesystem::path& outputDir,
-    const std::vector<ElementLetSummary>& summaries) {
-
-    std::filesystem::create_directories(outputDir);
-
-    for (const auto& summary : summaries) {
-        writeLetSummary(letSummaryPath(outputDir, summary.element),
-                        summary.records);
     }
 }
 

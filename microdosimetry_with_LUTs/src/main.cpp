@@ -190,17 +190,20 @@ int main(int argc, char* argv[]) {
                 reader.readChargedParticles(phspFile);
 
             LetCalculator calculator;
-            const std::vector<ElementLetSummary> summaries =
-                calculator.calculateByElement(letDirectory, chargedParticles);
+            const LetCalculationResult summary =
+                calculator.calculate(letDirectory, chargedParticles);
 
-            CsvWriter::writeElementLetSummaries(outputDir, summaries);
+            fs::create_directories(outputDir);
+            const fs::path summaryCsv = outputDir / "let_summary.csv";
+            CsvWriter::writeLetSummary(summaryCsv, summary.records);
 
             std::cout << "LET calculation completed.\n";
             std::cout << "LET folder: " << letDirectory << "\n";
             std::cout << "Phase-space file: " << phspFile << "\n";
             std::cout << "Charged particles found: " << chargedParticles.size() << "\n";
             std::cout << "Output directory: " << outputDir << "\n";
-            std::cout << "Element summaries written: " << summaries.size() << "\n";
+            std::cout << "Matched particles used: " << summary.matchedParticleCount << "\n";
+            std::cout << "LET summary CSV: " << summaryCsv << "\n";
             return 0;
         }
 
