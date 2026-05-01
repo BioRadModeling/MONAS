@@ -192,6 +192,14 @@ class SetupPanel(QWidget):
         self.rebin_samples_spin.setRange(1, 100_000_000)
         self.rebin_seed_spin = QSpinBox()
         self.rebin_seed_spin.setRange(0, 2_000_000_000)
+        for widget in (
+            self.decunha_voxel_combo,
+            self.decunha_grid_combo,
+            self.cartechini_radius_combo,
+            self.rebin_samples_spin,
+            self.rebin_seed_spin,
+        ):
+            widget.setMinimumHeight(32)
 
         grid.addWidget(QLabel("DeCunha voxel size"), 0, 0)
         grid.addWidget(self.decunha_voxel_combo, 0, 1)
@@ -203,6 +211,7 @@ class SetupPanel(QWidget):
         grid.addWidget(self.rebin_samples_spin, 3, 1)
         grid.addWidget(QLabel("Rebin seed"), 4, 0)
         grid.addWidget(self.rebin_seed_spin, 4, 1)
+        grid.setColumnStretch(1, 1)
         layout.addLayout(grid)
 
         for widget in (

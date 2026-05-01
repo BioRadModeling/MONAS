@@ -4,7 +4,16 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
-from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QMessageBox, QSplitter, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QMainWindow,
+    QMessageBox,
+    QScrollArea,
+    QSplitter,
+    QWidget,
+)
 
 from app.services.command_builder import build_command_specs, planned_output_files
 from app.services.input_checker import InputChecker
@@ -36,8 +45,13 @@ class MainWindow(QMainWindow):
 
         splitter = QSplitter()
         self.setup_panel = SetupPanel(self.state)
+        self.setup_scroll = QScrollArea()
+        self.setup_scroll.setWidgetResizable(True)
+        self.setup_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.setup_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setup_scroll.setWidget(self.setup_panel)
         self.results_panel = ResultsPanel()
-        splitter.addWidget(self.setup_panel)
+        splitter.addWidget(self.setup_scroll)
         splitter.addWidget(self.results_panel)
         splitter.setSizes([640, 760])
         layout.addWidget(splitter)
@@ -223,6 +237,10 @@ class MainWindow(QMainWindow):
                 border: 1px solid #d8d0c4;
                 border-radius: 8px;
                 padding: 6px;
+            }
+            QComboBox, QSpinBox {
+                padding-top: 4px;
+                padding-bottom: 4px;
             }
             QPushButton, QToolButton {
                 background: #ffffff;
