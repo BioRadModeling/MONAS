@@ -56,6 +56,31 @@ void CsvWriter::writePolySpectrum(const std::filesystem::path& outPath,
     }
 }
 
+void CsvWriter::writePolySpectrumMoments(
+    const std::filesystem::path& outPath,
+    const PolySpectrumMomentsSummary& summary) {
+
+    std::ofstream out(outPath);
+    if (!out) {
+        throw std::runtime_error(
+            "Failed to open output CSV for writing: " + outPath.string());
+    }
+
+    out << "distribution,mean_keV_per_um,variance_keV2_per_um2,"
+        << "stdev_keV_per_um,skewness\n";
+
+    const auto writeRow = [&out](const SpectrumDistributionMoments& moments) {
+        out << moments.distribution << ','
+            << moments.meanKeVPerUm << ','
+            << moments.varianceKeV2PerUm2 << ','
+            << moments.stdevKeVPerUm << ','
+            << moments.skewness << '\n';
+    };
+
+    writeRow(summary.frequency);
+    writeRow(summary.dose);
+}
+
 void CsvWriter::writeLetSummary(
     const std::filesystem::path& outPath,
     const std::vector<LetSummaryRecord>& records) {

@@ -112,6 +112,7 @@ def planned_output_files(state: AppState) -> list[Path]:
         return [
             output_dir / "proton_matches.csv",
             output_dir / "poly_spectrum.csv",
+            output_dir / "poly_spectrum_moments.csv",
         ]
 
     files: list[Path] = []

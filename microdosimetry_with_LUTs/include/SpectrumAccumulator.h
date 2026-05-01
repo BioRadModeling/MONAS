@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "LookupLibrary.h"
@@ -13,6 +14,19 @@ struct PolySpectrum {
     std::vector<double> yf;
     std::vector<double> d;
     std::vector<double> yd;
+};
+
+struct SpectrumDistributionMoments {
+    std::string distribution;
+    double meanKeVPerUm{0.0};
+    double varianceKeV2PerUm2{0.0};
+    double stdevKeVPerUm{0.0};
+    double skewness{0.0};
+};
+
+struct PolySpectrumMomentsSummary {
+    SpectrumDistributionMoments frequency;
+    SpectrumDistributionMoments dose;
 };
 
 class SpectrumAccumulator {
@@ -32,6 +46,7 @@ public:
                                      double upperWeight,
                                      double multiplicity);
     PolySpectrum finalize() const;
+    PolySpectrumMomentsSummary summarizeMoments(const PolySpectrum& spectrum) const;
 
 private:
     // Common interval representation used by both rebinners.
@@ -78,4 +93,6 @@ private:
     std::vector<double> buildPrecomputedRawFy(
         const LookupTable& table,
         std::size_t tableIndex) const;
+
+    double logarithmicBinNormalizationFactor() const;
 };

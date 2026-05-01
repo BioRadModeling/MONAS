@@ -198,7 +198,20 @@ Columns:
 - `d_y`
 - `yd_y`
 
-### 3. JPEG plot files
+### 3. `poly_spectrum_moments.csv`
+Summary moments derived from the final frequency and dose distributions.
+
+Columns:
+
+- `distribution`
+- `mean_keV_per_um`
+- `variance_keV2_per_um2`
+- `stdev_keV_per_um`
+- `skewness`
+
+The file contains one row for `frequency` and one row for `dose`.
+
+### 4. JPEG plot files
 Examples:
 - `yd_y_vs_y_keV_per_um.jpg`
 - `d_y_vs_y_keV_per_um.jpg`
@@ -571,9 +584,10 @@ This command:
 - keeps only protons,
 - interpolates each proton between two monoenergetic lookup spectra,
 - accumulates the weighted contributions,
-- writes both:
+- writes:
   - `../output/proton_matches.csv`
   - `../output/poly_spectrum.csv`
+  - `../output/poly_spectrum_moments.csv`
 
 Expected output:
 
@@ -584,6 +598,7 @@ Phase-space file:   "../input/PhaseSpace.phsp"
 Protons found:      552711
 Match CSV:          "../output/proton_matches.csv"
 Poly spectrum CSV:  "../output/poly_spectrum.csv"
+Poly spectrum moments CSV:  "../output/poly_spectrum_moments.csv"
 ```
 
 ---

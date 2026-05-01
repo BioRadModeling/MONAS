@@ -484,10 +484,15 @@ int main(int argc, char* argv[]) {
                 std::cout << "Rebin seed: " << rebinSeed << "\n";
 
                 const PolySpectrum spectrum = accumulator.finalize();
+                const PolySpectrumMomentsSummary moments =
+                    accumulator.summarizeMoments(spectrum);
                 const fs::path polyCsv = outputDir / "poly_spectrum.csv";
+                const fs::path momentsCsv = outputDir / "poly_spectrum_moments.csv";
                 CsvWriter::writePolySpectrum(polyCsv, spectrum);
+                CsvWriter::writePolySpectrumMoments(momentsCsv, moments);
 
                 std::cout << "Poly spectrum CSV: " << polyCsv << "\n";
+                std::cout << "Poly spectrum moments CSV: " << momentsCsv << "\n";
             }
 
             return 0;

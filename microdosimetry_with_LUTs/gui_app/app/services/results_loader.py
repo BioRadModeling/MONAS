@@ -223,7 +223,10 @@ class ResultsLoader:
         group_score = 3
 
         if state.approach == "spectrum" and (
-            name.startswith("poly_spectrum") or name.startswith("proton_matches") or "_vs_y_" in name
+            name.startswith("poly_spectrum")
+            or name.startswith("poly_spectrum_moments")
+            or name.startswith("proton_matches")
+            or "_vs_y_" in name
         ):
             group_score = 0
         elif state.approach == "means" and (
@@ -248,6 +251,7 @@ class ResultsLoader:
     def _logical_stem(self, filename: str) -> str:
         lower = filename.lower()
         for stem in (
+            "poly_spectrum_moments",
             "poly_spectrum",
             "proton_matches",
             "let_summary",

@@ -15,6 +15,98 @@ bool isFinitePositive(double x) {
     return std::isfinite(x) && x > 0.0;
 }
 
+void validateSpectrumShape(const PolySpectrum& spectrum) {
+    const std::size_t nBins = spectrum.y.size();
+    if (nBins < 2) {
+        throw std::runtime_error("Insufficient rebinned y-grid size.");
+    }
+
+    if (spectrum.f.size() != nBins || spectrum.yf.size() != nBins ||
+        spectrum.d.size() != nBins || spectrum.yd.size() != nBins) {
+        throw std::runtime_error(
+            "PolySpectrum vectors must all have the same size.");
+    }
+}
+
+SpectrumDistributionMoments computeDistributionMoments(
+    const std::vector<double>& yValues,
+    const std::vector<double>& densityValues,
+    const std::string& distribution,
+    double normalizationFactor) {
+
+    if (yValues.size() != densityValues.size()) {
+        throw std::runtime_error(
+            "Cannot compute distribution moments with mismatched vector sizes.");
+    }
+
+    SpectrumDistributionMoments moments;
+    moments.distribution = distribution;
+
+    double totalProbability = 0.0;
+    for (std::size_t i = 0; i < yValues.size(); ++i) {
+        const double y = yValues[i];
+        const double density = densityValues[i];
+
+        if (!isFinitePositive(y)) {
+            throw std::runtime_error(
+                "Cannot compute distribution moments with a non-positive y value.");
+        }
+        if (!std::isfinite(density) || density < 0.0) {
+            throw std::runtime_error(
+                "Cannot compute distribution moments with an invalid density value.");
+        }
+
+        totalProbability += normalizationFactor * y * density;
+    }
+
+    if (!(totalProbability > 0.0)) {
+        throw std::runtime_error(
+            "Cannot compute distribution moments with non-positive total probability.");
+    }
+
+    double meanNumerator = 0.0;
+    for (std::size_t i = 0; i < yValues.size(); ++i) {
+        const double probability = normalizationFactor * yValues[i] * densityValues[i];
+        meanNumerator += probability * yValues[i];
+    }
+    moments.meanKeVPerUm = meanNumerator / totalProbability;
+
+    double varianceNumerator = 0.0;
+    for (std::size_t i = 0; i < yValues.size(); ++i) {
+        const double probability = normalizationFactor * yValues[i] * densityValues[i];
+        const double delta = yValues[i] - moments.meanKeVPerUm;
+        varianceNumerator += probability * delta * delta;
+    }
+
+    moments.varianceKeV2PerUm2 = varianceNumerator / totalProbability;
+    if (moments.varianceKeV2PerUm2 < 0.0 &&
+        std::abs(moments.varianceKeV2PerUm2) < 1.0e-12) {
+        moments.varianceKeV2PerUm2 = 0.0;
+    }
+    if (moments.varianceKeV2PerUm2 < 0.0) {
+        throw std::runtime_error(
+            "Cannot compute distribution moments with a negative variance.");
+    }
+
+    moments.stdevKeVPerUm = std::sqrt(moments.varianceKeV2PerUm2);
+
+    if (moments.stdevKeVPerUm == 0.0) {
+        moments.skewness = 0.0;
+        return moments;
+    }
+
+    double skewnessNumerator = 0.0;
+    for (std::size_t i = 0; i < yValues.size(); ++i) {
+        const double probability = normalizationFactor * yValues[i] * densityValues[i];
+        const double standardized =
+            (yValues[i] - moments.meanKeVPerUm) / moments.stdevKeVPerUm;
+        skewnessNumerator += probability * standardized * standardized * standardized;
+    }
+
+    moments.skewness = skewnessNumerator / totalProbability;
+    return moments;
+}
+
 }  // namespace
 
 SpectrumAccumulator::SpectrumAccumulator(
@@ -514,16 +606,7 @@ PolySpectrum SpectrumAccumulator::finalize() const {
         rawFy[i] = numerator_[i] / denominator_;
     }
 
-    if (yCenters_.size() < 2) {
-        throw std::runtime_error("Insufficient rebinned y-grid size.");
-    }
-
-    const double deltaLogY = std::log10(yCenters_[1]) - std::log10(yCenters_[0]);
-    const double C = std::log(10.0) * deltaLogY;
-
-    if (!(C > 0.0)) {
-        throw std::runtime_error("Invalid logarithmic-bin normalization factor C.");
-    }
+    const double C = logarithmicBinNormalizationFactor();
 
     double fyNormDen = 0.0;
     for (std::size_t i = 0; i < yCenters_.size(); ++i) {
@@ -556,4 +639,39 @@ PolySpectrum SpectrumAccumulator::finalize() const {
     }
 
     return out;
+}
+
+PolySpectrumMomentsSummary SpectrumAccumulator::summarizeMoments(
+    const PolySpectrum& spectrum) const {
+
+    validateSpectrumShape(spectrum);
+
+    if (spectrum.y.size() != yCenters_.size()) {
+        throw std::runtime_error(
+            "Cannot summarize moments for a spectrum built on a different y grid.");
+    }
+
+    const double normalizationFactor = logarithmicBinNormalizationFactor();
+
+    PolySpectrumMomentsSummary summary;
+    summary.frequency = computeDistributionMoments(
+        spectrum.y, spectrum.f, "frequency", normalizationFactor);
+    summary.dose = computeDistributionMoments(
+        spectrum.y, spectrum.d, "dose", normalizationFactor);
+    return summary;
+}
+
+double SpectrumAccumulator::logarithmicBinNormalizationFactor() const {
+    if (yCenters_.size() < 2) {
+        throw std::runtime_error("Insufficient rebinned y-grid size.");
+    }
+
+    const double deltaLogY = std::log10(yCenters_[1]) - std::log10(yCenters_[0]);
+    const double normalizationFactor = std::log(10.0) * deltaLogY;
+
+    if (!(normalizationFactor > 0.0)) {
+        throw std::runtime_error("Invalid logarithmic-bin normalization factor C.");
+    }
+
+    return normalizationFactor;
 }

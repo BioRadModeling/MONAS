@@ -34,6 +34,10 @@ public:
     static void writePolySpectrum(const std::filesystem::path& outPath,
                                   const PolySpectrum& spectrum);
 
+    static void writePolySpectrumMoments(
+        const std::filesystem::path& outPath,
+        const PolySpectrumMomentsSummary& summary);
+
     static void writeLetSummary(const std::filesystem::path& outPath,
                                 const std::vector<LetSummaryRecord>& records);
 
