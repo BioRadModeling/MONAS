@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSplitter,
     QStackedWidget,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -144,6 +145,16 @@ class ResultsPanel(QWidget):
         self.spectrum_metric_combo = QComboBox()
         self.spectrum_metric_combo.addItem("yf(y)", "yf_y")
         self.spectrum_metric_combo.addItem("yd(y)", "yd_y")
+        self.spectrum_metric_combo.setMinimumContentsLength(8)
+        self.spectrum_metric_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents
+        )
+        self.spectrum_metric_combo.setMinimumWidth(120)
+        self.spectrum_metric_combo.setSizePolicy(
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed,
+        )
+        self.spectrum_metric_combo.view().setMinimumWidth(120)
         self.spectrum_metric_combo.setCurrentIndex(1)
         self.spectrum_metric_combo.currentIndexChanged.connect(self._refresh_spectrum_chart)
         self.spectrum_metric_combo.currentIndexChanged.connect(self._sync_preferred_file_with_metric)

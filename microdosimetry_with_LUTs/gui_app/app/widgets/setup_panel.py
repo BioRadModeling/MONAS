@@ -68,9 +68,9 @@ class SetupPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         title_box = QVBoxLayout()
-        eyebrow = QLabel("Analysis setup")
+        eyebrow = QLabel("Version 1.0")
         eyebrow.setObjectName("EyebrowLabel")
-        title = QLabel("Configure the run once")
+        title = QLabel("FAST MICRODOSIMETRY")
         title.setObjectName("PanelTitle")
         title_box.addWidget(eyebrow)
         title_box.addWidget(title)

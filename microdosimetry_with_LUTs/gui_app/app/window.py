@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
         self._loaded_results = LoadedResults()
         self._run_status = "Ready to configure a run."
 
-        self.setWindowTitle("MONAS Desktop Wrapper")
+        self.setWindowTitle("MONAS Fast Microdosimetry GUI")
         self.resize(1400, 920)
 
         central = QWidget()
