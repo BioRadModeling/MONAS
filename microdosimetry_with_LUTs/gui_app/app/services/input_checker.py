@@ -10,6 +10,9 @@ from app.state import AppState
 LET_ELEMENTS = ("H", "He", "Li", "Be", "B", "C", "N", "O")
 INANIWA_ATOMIC_NUMBERS = tuple(range(1, 11))
 PROTON_FILENAME_PATTERN = re.compile(r"^Proton_([0-9]+(?:\.[0-9]+)?)_MeV\.csv$")
+CARTECHINI_FILENAME_PATTERN = re.compile(
+    r"^H_E([0-9]+(?:\.[0-9]+)?)_R(?:0\.5|8(?:\.0)?)(?:_[^.]+)?\.txt$"
+)
 
 
 @dataclass
@@ -174,7 +177,7 @@ class InputChecker:
         )
         if out_of_range > 0:
             warnings.append(
-                f"{out_of_range} proton rows sit outside the selected spectrum LUT range and would clamp to endpoint behavior."
+                f"{out_of_range} proton rows sit outside the selected spectrum LUT range. If Cartechini selected, fallback to DeCunha will occur. If DeCunha selected, clamping to DeCunha high endpoint will occur."
             )
 
     def _add_means_warnings(
@@ -214,10 +217,16 @@ class InputChecker:
             return self._spectrum_range_cache[spectrum_dir]
 
         energies: list[float] = []
-        for path in spectrum_dir.glob("*.csv"):
-            match = PROTON_FILENAME_PATTERN.match(path.name)
-            if not match:
+        for path in spectrum_dir.iterdir():
+            if not path.is_file():
                 continue
+
+            match = PROTON_FILENAME_PATTERN.match(path.name)
+            if match is None:
+                match = CARTECHINI_FILENAME_PATTERN.match(path.name)
+            if match is None:
+                continue
+
             try:
                 energies.append(float(match.group(1)))
             except ValueError:
