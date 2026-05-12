@@ -455,6 +455,128 @@ z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy
 
 ---
 
+## AMF TOPAS replay calculations
+
+The `AMF-stage` and `AMF-run` modes prepare and run the TOPAS Analytical
+Microdosimetric Function extension from a TOPAS phase-space pair.
+
+Unlike the LUT-only modes, AMF is not calculated directly inside this executable.
+This project stages a reproducible TOPAS replay folder, copies the required
+`tsed.dat` file, writes a TOPAS parameter file, and optionally launches TOPAS.
+
+AMF requires both files in the phase-space pair:
+
+```text
+input/PhaseSpace_curved_33mm.phsp
+input/PhaseSpace_curved_33mm.header
+```
+
+The `.header` file is passed to TOPAS for phase-space replay metadata. The
+particle counts in the header should not be used as truth for depth-specific
+particle counts.
+
+The AMF lookup data file must exist here:
+
+```text
+lookup_tables/AMF/tsed.dat
+```
+
+The AMF extension source is stored here for building into TOPAS:
+
+```text
+amf_extension/
+```
+
+### Stage an AMF run
+
+From `microdosimetry_with_LUTs`:
+
+```bash
+./build/microdosimetry_with_LUTs AMF-stage \
+  lookup_tables \
+  input/PhaseSpace_curved_33mm \
+  amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD \
+  AMF_yD
+```
+
+This creates:
+
+```text
+amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD/replay_amf.txt
+amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD/amf_run_manifest.txt
+amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD/tsed.dat
+amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD/PhaseSpace_curved_33mm.phsp
+amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD/PhaseSpace_curved_33mm.header
+```
+
+### Run TOPAS through the wrapper
+
+Use a TOPAS executable that has the AMF extension compiled in:
+
+```bash
+./build/microdosimetry_with_LUTs AMF-run \
+  /path/to/topas \
+  lookup_tables \
+  input/PhaseSpace_curved_33mm \
+  amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD \
+  AMF_yD
+```
+
+Supported AMF quantities are:
+
+- `AMFSpectra`: full microdosimetric spectra per scoring voxel
+- `AMF_yD`: dose-weighted mean lineal energy per scoring voxel
+- `AMF_yS`: saturation-corrected dose mean lineal energy per scoring voxel
+
+The generated TOPAS parameter file uses accuracy-first defaults:
+
+```text
+d:Ph/Default/CutForElectron = 1000 m
+d:Sc/AMF/DomainRadius = 0.28 um
+s:Sc/AMF/StoppingPowerCalculation = "Topas"
+s:Sc/AMF/StepCalculator = "MidStep"
+```
+
+For `AMF_yS`, it also writes:
+
+```text
+d:Sc/AMF/NucleusRadius = 3.9 um
+d:Sc/AMF/BetaRef = 0.0615 /Gy2
+```
+
+After TOPAS exits, `AMF-run` reports whether the expected AMF output files were
+found. See `amf_runtime/README.md` for the full AMF runbook and option list.
+
+For repeated depth files, use the batch helper:
+
+```bash
+python3 macros/run_amf_depths.py \
+  --topas /path/to/topas \
+  --quantity AMF_yD \
+  --input-dir input \
+  --lookup-root lookup_tables \
+  --staged-root amf_runtime/staged_runs \
+  --auto-slab-geometry \
+  -- \
+  --no-phase-space-precheck
+```
+
+For phase-space replay, `--auto-slab-geometry` scores each pair in a
+`10 cm x 10 cm x 1 mm` water slab centered on that phase-space file's z-plane.
+This mirrors the macroscopic 1 mm slab scoring scale used in the AMF TOPAS
+paper while still using the available depth-specific phase-space files.
+
+Then summarize which AMF runs produced their expected outputs:
+
+```bash
+python3 macros/summarize_amf_runs.py \
+  --staged-root amf_runtime/staged_runs \
+  --output-csv amf_runtime/amf_run_summary.csv \
+  --print-missing
+```
+
+---
+
 ## Before you start
 
 You need:

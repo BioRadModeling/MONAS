@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "AmfResultParser.h"
+#include "AmfRunner.h"
 #include "CsvWriter.h"
 #include "InaniwaCalculator.h"
 #include "InaniwaLookup.h"
@@ -41,6 +43,55 @@ LutFamily parseLutFamily(const std::string& lutName) {
     throw std::runtime_error(
         "Unknown LUT family '" + lutName +
         "'. Expected Cartechini or DeCunha.");
+}
+
+AmfQuantity parseAmfQuantity(const std::string& quantityName) {
+    const std::string lower = toLower(quantityName);
+
+    if (lower == "amfspectra" || lower == "spectra") {
+        return AmfQuantity::Spectra;
+    }
+    if (lower == "amf_yd" || lower == "yd" || lower == "y_d") {
+        return AmfQuantity::YD;
+    }
+    if (lower == "amf_ys" || lower == "ys" || lower == "y_s") {
+        return AmfQuantity::YS;
+    }
+
+    throw std::runtime_error(
+        "Unknown AMF quantity '" + quantityName +
+        "'. Expected AMFSpectra, AMF_yD, or AMF_yS.");
+}
+
+AmfStoppingPowerMode parseAmfStoppingPowerMode(const std::string& modeName) {
+    const std::string lower = toLower(modeName);
+
+    if (lower == "topas") {
+        return AmfStoppingPowerMode::Topas;
+    }
+    if (lower == "externaltable" || lower == "external_table" ||
+        lower == "external-table") {
+        return AmfStoppingPowerMode::ExternalTable;
+    }
+
+    throw std::runtime_error(
+        "Unknown AMF stopping-power mode '" + modeName +
+        "'. Expected Topas or ExternalTable.");
+}
+
+AmfStepCalculatorMode parseAmfStepCalculatorMode(const std::string& modeName) {
+    const std::string lower = toLower(modeName);
+
+    if (lower == "midstep" || lower == "mid_step" || lower == "mid-step") {
+        return AmfStepCalculatorMode::MidStep;
+    }
+    if (lower == "prestep" || lower == "pre_step" || lower == "pre-step") {
+        return AmfStepCalculatorMode::PreStep;
+    }
+
+    throw std::runtime_error(
+        "Unknown AMF step-calculator mode '" + modeName +
+        "'. Expected MidStep or PreStep.");
 }
 
 std::string resolveFolderName(const std::string& voxelSize,
@@ -97,6 +148,112 @@ fs::path resolveLibraryDir(const fs::path& lookupRoot,
     return lookupRoot / lutName / resolveFolderName(voxelSize, energyGrid);
 }
 
+void parseOptionalAmfStageArgs(int argc,
+                               char* argv[],
+                               int startIndex,
+                               AmfConfig& config) {
+    for (int i = startIndex; i < argc; ++i) {
+        const std::string arg = argv[i];
+
+        if (arg == "--domain-radius") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --domain-radius");
+            }
+            config.domainRadiusUm = std::stod(argv[++i]);
+        } else if (arg == "--nucleus-radius") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --nucleus-radius");
+            }
+            config.nucleusRadiusUm = std::stod(argv[++i]);
+        } else if (arg == "--beta-ref") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --beta-ref");
+            }
+            config.betaRefPerGy2 = std::stod(argv[++i]);
+        } else if (arg == "--scoring-component") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-component");
+            }
+            config.scoringComponent = argv[++i];
+        } else if (arg == "--scoring-material") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-material");
+            }
+            config.scoringMaterial = argv[++i];
+        } else if (arg == "--scoring-half-length" ||
+                   arg == "--scoring-half-length-mm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-half-length");
+            }
+            const double halfLengthMm = std::stod(argv[++i]);
+            config.scoringHalfLengthXmm = halfLengthMm;
+            config.scoringHalfLengthYmm = halfLengthMm;
+            config.scoringHalfLengthZmm = halfLengthMm;
+        } else if (arg == "--scoring-half-length-x-mm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-half-length-x-mm");
+            }
+            config.scoringHalfLengthXmm = std::stod(argv[++i]);
+        } else if (arg == "--scoring-half-length-y-mm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-half-length-y-mm");
+            }
+            config.scoringHalfLengthYmm = std::stod(argv[++i]);
+        } else if (arg == "--scoring-half-length-z-mm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-half-length-z-mm");
+            }
+            config.scoringHalfLengthZmm = std::stod(argv[++i]);
+        } else if (arg == "--scoring-x-mm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-x-mm");
+            }
+            config.scoringTransXmm = std::stod(argv[++i]);
+        } else if (arg == "--scoring-y-mm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-y-mm");
+            }
+            config.scoringTransYmm = std::stod(argv[++i]);
+        } else if (arg == "--scoring-z-mm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-z-mm");
+            }
+            config.scoringTransZmm = std::stod(argv[++i]);
+        } else if (arg == "--world-half-length-cm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --world-half-length-cm");
+            }
+            config.worldHalfLengthCm = std::stod(argv[++i]);
+        } else if (arg == "--electron-cut" || arg == "--electron-cut-m") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --electron-cut");
+            }
+            config.electronRangeCutM = std::stod(argv[++i]);
+        } else if (arg == "--stopping-power") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --stopping-power");
+            }
+            config.stoppingPowerMode = parseAmfStoppingPowerMode(argv[++i]);
+        } else if (arg == "--step-calculator") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --step-calculator");
+            }
+            config.stepCalculatorMode = parseAmfStepCalculatorMode(argv[++i]);
+        } else if (arg == "--output-file") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --output-file");
+            }
+            config.outputFile = argv[++i];
+        } else if (arg == "--phase-space-precheck") {
+            config.phaseSpacePreCheck = true;
+        } else if (arg == "--no-phase-space-precheck") {
+            config.phaseSpacePreCheck = false;
+        } else {
+            throw std::runtime_error("Unknown AMF option: " + arg);
+        }
+    }
+}
+
 void parseOptionalBuildArgs(int argc,
                             char* argv[],
                             int startIndex,
@@ -121,6 +278,18 @@ void parseOptionalBuildArgs(int argc,
         } else {
             throw std::runtime_error("Unknown option: " + arg);
         }
+    }
+}
+
+void printAmfResultFileStatus(const AmfResultFiles& files) {
+    const bool scorerOutputExists = fs::exists(files.scorerOutputFile);
+    std::cout << "Expected scorer output: " << files.scorerOutputFile
+              << " [" << (scorerOutputExists ? "FOUND" : "MISSING") << "]\n";
+
+    if (files.spectraCsvFile.has_value()) {
+        const bool spectraCsvExists = fs::exists(*files.spectraCsvFile);
+        std::cout << "Expected spectra CSV: " << *files.spectraCsvFile
+                  << " [" << (spectraCsvExists ? "FOUND" : "MISSING") << "]\n";
     }
 }
 
@@ -155,7 +324,27 @@ void printUsage(const char* programName) {
         << "\n"
         << "  Inaniwa:\n"
         << "    " << programName
-        << " Inaniwa <lookupRoot> <phspFile> <outputDir>\n";
+        << " Inaniwa <lookupRoot> <phspFile> <outputDir>\n"
+        << "\n"
+        << "  AMF staging:\n"
+        << "    " << programName
+        << " AMF-stage <lookupRoot> <phaseSpaceBase> <stagedRunDir> "
+        << "<AMFSpectra|AMF_yD|AMF_yS>"
+        << " [--domain-radius um] [--nucleus-radius um] [--beta-ref value]"
+        << " [--scoring-component name] [--scoring-material material]"
+        << " [--scoring-half-length-mm mm]"
+        << " [--scoring-half-length-x-mm mm]"
+        << " [--scoring-half-length-y-mm mm]"
+        << " [--scoring-half-length-z-mm mm]"
+        << " [--scoring-x-mm mm] [--scoring-y-mm mm] [--scoring-z-mm mm]"
+        << " [--world-half-length-cm cm] [--electron-cut-m m]"
+        << " [--stopping-power Topas|ExternalTable]"
+        << " [--step-calculator MidStep|PreStep]"
+        << " [--phase-space-precheck|--no-phase-space-precheck]"
+        << " [--output-file name]\n"
+        << "    " << programName
+        << " AMF-run <topasExecutable> <lookupRoot> <phaseSpaceBase> "
+        << "<stagedRunDir> <AMFSpectra|AMF_yD|AMF_yS> [same options]\n";
 }
 
 }  // namespace
@@ -168,6 +357,88 @@ int main(int argc, char* argv[]) {
         }
 
         const std::string mode = argv[1];
+
+        if (mode == "AMF-stage") {
+            if (argc < 6) {
+                throw std::runtime_error(
+                    "AMF-stage requires: <lookupRoot> <phaseSpaceBase> "
+                    "<stagedRunDir> <AMFSpectra|AMF_yD|AMF_yS>");
+            }
+
+            AmfConfig config;
+            const fs::path lookupRoot = argv[2];
+            config.tsedPath = lookupRoot / "AMF" / "tsed.dat";
+            config.phaseSpaceBasePath = argv[3];
+            config.stagedRunDir = argv[4];
+            config.quantity = parseAmfQuantity(argv[5]);
+            config.outputFile =
+                config.phaseSpaceBasePath.filename().string() + "_" +
+                toTopasQuantityName(config.quantity);
+
+            parseOptionalAmfStageArgs(argc, argv, 6, config);
+
+            const AmfStagedRun stagedRun = AmfRunner::stageRun(config);
+
+            std::cout << "AMF run staged.\n";
+            std::cout << "Run directory: " << stagedRun.runDirectory << "\n";
+            std::cout << "Parameter file: " << stagedRun.parameterFile << "\n";
+            std::cout << "Manifest file: " << stagedRun.manifestFile << "\n";
+            std::cout << "Staged tsed.dat: " << stagedRun.stagedTsedPath << "\n";
+            std::cout << "Staged phase space: "
+                      << stagedRun.stagedPhaseSpacePath << "\n";
+            std::cout << "Staged header: " << stagedRun.stagedHeaderPath << "\n";
+            return 0;
+        }
+
+        if (mode == "AMF-run") {
+            if (argc < 7) {
+                throw std::runtime_error(
+                    "AMF-run requires: <topasExecutable> <lookupRoot> "
+                    "<phaseSpaceBase> <stagedRunDir> "
+                    "<AMFSpectra|AMF_yD|AMF_yS>");
+            }
+
+            AmfConfig config;
+            config.topasExecutable = argv[2];
+            const fs::path lookupRoot = argv[3];
+            config.tsedPath = lookupRoot / "AMF" / "tsed.dat";
+            config.phaseSpaceBasePath = argv[4];
+            config.stagedRunDir = argv[5];
+            config.quantity = parseAmfQuantity(argv[6]);
+            config.outputFile =
+                config.phaseSpaceBasePath.filename().string() + "_" +
+                toTopasQuantityName(config.quantity);
+
+            parseOptionalAmfStageArgs(argc, argv, 7, config);
+
+            const AmfRunResult result = AmfRunner::runTopas(config);
+
+            std::cout << "AMF TOPAS run completed.\n";
+            std::cout << "Exit code: " << result.exitCode << "\n";
+            std::cout << "Run directory: " << result.stagedRun.runDirectory << "\n";
+            std::cout << "Parameter file: " << result.stagedRun.parameterFile << "\n";
+            std::cout << "Manifest file: " << result.stagedRun.manifestFile << "\n";
+            std::cout << "Stdout log: " << result.stdoutLog << "\n";
+            std::cout << "Stderr log: " << result.stderrLog << "\n";
+
+            const AmfResultFiles resultFiles =
+                AmfResultParser::expectedResultFiles(config, result.stagedRun);
+            printAmfResultFileStatus(resultFiles);
+
+            if (result.exitCode != 0) {
+                return 2;
+            }
+
+            if (!AmfResultParser::hasExpectedResults(config, result.stagedRun)) {
+                std::cout.flush();
+                std::cerr
+                    << "ERROR: TOPAS exited successfully, but expected AMF "
+                    << "result file(s) were not found.\n";
+                return 3;
+            }
+
+            return 0;
+        }
 
         if (mode == "LET") {
             if (argc != 5) {

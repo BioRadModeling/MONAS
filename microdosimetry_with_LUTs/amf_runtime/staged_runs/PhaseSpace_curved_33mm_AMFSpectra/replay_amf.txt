@@ -1,0 +1,42 @@
+# Generated TOPAS AMF phase-space replay file
+# Keep tsed.dat in the same directory where this file is launched.
+
+# Phase-space source
+s:So/Replay/Type = "PhaseSpace"
+s:So/Replay/Component = "World"
+s:So/Replay/PhaseSpaceFileName = "PhaseSpace_curved_33mm"
+b:So/Replay/PhaseSpacePreCheck = "False"
+
+# Geometry
+d:Ge/World/HLX = 148.79 cm
+d:Ge/World/HLY = 148.79 cm
+d:Ge/World/HLZ = 148.79 cm
+s:Ge/World/Material = "Air"
+
+s:Ge/AMFScoringVolume/Parent = "World"
+s:Ge/AMFScoringVolume/Type = "TsBox"
+s:Ge/AMFScoringVolume/Material = "G4_WATER"
+d:Ge/AMFScoringVolume/HLX = 50 mm
+d:Ge/AMFScoringVolume/HLY = 50 mm
+d:Ge/AMFScoringVolume/HLZ = 0.5 mm
+d:Ge/AMFScoringVolume/TransX = 0 mm
+d:Ge/AMFScoringVolume/TransY = 0 mm
+d:Ge/AMFScoringVolume/TransZ = -1387.4 mm
+d:Ge/AMFScoringVolume/RotX = 0.0 deg
+d:Ge/AMFScoringVolume/RotY = 0.0 deg
+d:Ge/AMFScoringVolume/RotZ = 0.0 deg
+
+# Electron production cut
+# AMF spectra include secondary-electron/delta-ray contributions
+# analytically. Use a high electron range cut to suppress explicit
+# secondary-electron transport and avoid double counting.
+d:Ph/Default/CutForElectron = 1000 m
+
+# AMF scorer
+s:Sc/AMF/Quantity = "AMFSpectra"
+s:Sc/AMF/Component = "AMFScoringVolume"
+s:Sc/AMF/OutputFile = "PhaseSpace_curved_33mm_AMFSpectra"
+s:Sc/AMF/IfOutputFileAlreadyExists = "Overwrite"
+d:Sc/AMF/DomainRadius = 0.28 um
+s:Sc/AMF/StoppingPowerCalculation = "Topas"
+s:Sc/AMF/StepCalculator = "MidStep"

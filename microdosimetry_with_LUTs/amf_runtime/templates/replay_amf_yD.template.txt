@@ -1,0 +1,54 @@
+# TOPAS AMF_yD phase-space replay template
+#
+# Replace all {{PLACEHOLDER}} values before running.
+# Keep tsed.dat in the same directory where this parameter file is launched.
+
+# -----------------------------------------------------------------------------
+# Phase-space source
+# -----------------------------------------------------------------------------
+s:So/Replay/Type = "PhaseSpace"
+s:So/Replay/Component = "World"
+s:So/Replay/PhaseSpaceFileName = "{{PHASE_SPACE_BASENAME}}"
+b:So/Replay/PhaseSpacePreCheck = "True"
+
+# -----------------------------------------------------------------------------
+# Geometry
+# -----------------------------------------------------------------------------
+d:Ge/World/HLX = 20.0 cm
+d:Ge/World/HLY = 20.0 cm
+d:Ge/World/HLZ = 20.0 cm
+s:Ge/World/Material = "Air"
+
+s:Ge/{{SCORING_COMPONENT}}/Parent = "World"
+s:Ge/{{SCORING_COMPONENT}}/Type = "TsBox"
+s:Ge/{{SCORING_COMPONENT}}/Material = "G4_WATER"
+d:Ge/{{SCORING_COMPONENT}}/HLX = 0.5 mm
+d:Ge/{{SCORING_COMPONENT}}/HLY = 0.5 mm
+d:Ge/{{SCORING_COMPONENT}}/HLZ = 0.5 mm
+d:Ge/{{SCORING_COMPONENT}}/TransX = 0.0 mm
+d:Ge/{{SCORING_COMPONENT}}/TransY = 0.0 mm
+d:Ge/{{SCORING_COMPONENT}}/TransZ = 0.0 mm
+d:Ge/{{SCORING_COMPONENT}}/RotX = 0.0 deg
+d:Ge/{{SCORING_COMPONENT}}/RotY = 0.0 deg
+d:Ge/{{SCORING_COMPONENT}}/RotZ = 0.0 deg
+
+# -----------------------------------------------------------------------------
+# Electron production cut
+# -----------------------------------------------------------------------------
+# AMF spectra already include secondary-electron/delta-ray contributions
+# analytically. Use a very high electron range cut to suppress explicit
+# secondary-electron transport and avoid double counting.
+#
+d:Ph/Default/CutForElectron = 1000.0 m
+
+# -----------------------------------------------------------------------------
+# AMF_yD scorer
+# -----------------------------------------------------------------------------
+s:Sc/AMFyD/Quantity = "AMF_yD"
+s:Sc/AMFyD/Component = "{{SCORING_COMPONENT}}"
+s:Sc/AMFyD/OutputFile = "{{OUTPUT_FILE}}"
+d:Sc/AMFyD/DomainRadius = {{DOMAIN_RADIUS_UM}} um
+
+# Optional AMF controls. Defaults used by the scorer are shown here explicitly.
+s:Sc/AMFyD/StoppingPowerCalculation = "Topas"
+s:Sc/AMFyD/StepCalculator = "MidStep"
