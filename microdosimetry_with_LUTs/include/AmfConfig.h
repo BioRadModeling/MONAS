@@ -25,6 +25,9 @@ enum class AmfDetectorType {
     TEGas
 };
 
+inline constexpr double kMinAmfDomainRadiusUm = 0.0015;
+inline constexpr double kMaxAmfDomainRadiusUm = 0.5;
+
 struct AmfConfig {
     AmfQuantity quantity{AmfQuantity::YD};
     AmfStoppingPowerMode stoppingPowerMode{AmfStoppingPowerMode::Topas};
@@ -103,6 +106,11 @@ inline const char* toAmfDetectorTypeName(AmfDetectorType detectorType) {
     }
 
     return "water";
+}
+
+inline bool isValidAmfDomainRadiusUm(double radiusUm) {
+    return radiusUm >= kMinAmfDomainRadiusUm &&
+           radiusUm <= kMaxAmfDomainRadiusUm;
 }
 
 inline void applyAmfDetectorPreset(AmfConfig& config,

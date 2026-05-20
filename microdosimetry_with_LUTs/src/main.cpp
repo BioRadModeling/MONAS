@@ -185,6 +185,10 @@ void parseOptionalAmfStageArgs(int argc,
                 throw std::runtime_error("Missing value after --domain-radius");
             }
             config.domainRadiusUm = std::stod(argv[++i]);
+            if (!isValidAmfDomainRadiusUm(config.domainRadiusUm)) {
+                throw std::runtime_error(
+                    "--domain-radius must be between 0.0015 um and 0.5 um");
+            }
         } else if (arg == "--nucleus-radius") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("Missing value after --nucleus-radius");
@@ -360,7 +364,8 @@ void printUsage(const char* programName) {
         << "    " << programName
         << " AMF-stage <lookupRoot> <phaseSpaceBase> <stagedRunDir> "
         << "<AMFSpectra|AMF_yD|AMF_yS>"
-        << " [--domain-radius um] [--nucleus-radius um] [--beta-ref value]"
+        << " [--domain-radius um(0.0015-0.5)]"
+        << " [--nucleus-radius um] [--beta-ref value]"
         << " [--detector water|silicon|TEgas]"
         << " [--scoring-component name] [--scoring-material material]"
         << " [--scoring-half-length-mm mm]"

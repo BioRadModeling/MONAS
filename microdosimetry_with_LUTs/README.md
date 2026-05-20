@@ -558,6 +558,15 @@ s:Sc/AMF/StoppingPowerCalculation = "Topas"
 s:Sc/AMF/StepCalculator = "MidStep"
 ```
 
+The domain radius can be changed with `--domain-radius`, but the CLI enforces
+the AMF development range:
+
+```bash
+--domain-radius 0.28
+```
+
+Allowed range: `0.0015 um <= DomainRadius <= 0.5 um`.
+
 For `AMF_yS`, it also writes:
 
 ```text

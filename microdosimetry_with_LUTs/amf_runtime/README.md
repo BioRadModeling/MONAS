@@ -267,6 +267,13 @@ Override the domain radius:
 --domain-radius 0.28
 ```
 
+The AMF implementation only accepts values in the range for which AMF was
+developed:
+
+```text
+0.0015 um <= DomainRadius <= 0.5 um
+```
+
 Override saturation parameters for `AMF_yS`:
 
 ```bash

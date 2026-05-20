@@ -128,9 +128,18 @@ int normalizeSystemExitCode(int systemStatus) {
     return systemStatus;
 }
 
+void validateConfig(const AmfConfig& config) {
+    if (!isValidAmfDomainRadiusUm(config.domainRadiusUm)) {
+        throw std::runtime_error(
+            "AMF domain radius must be between 0.0015 um and 0.5 um.");
+    }
+}
+
 }  // namespace
 
 AmfStagedRun AmfRunner::stageRun(const AmfConfig& config) {
+    validateConfig(config);
+
     const PhaseSpacePair phaseSpacePair =
         validatePhaseSpacePair(config.phaseSpaceBasePath);
     requireRegularFile(config.tsedPath, "AMF tsed.dat");
