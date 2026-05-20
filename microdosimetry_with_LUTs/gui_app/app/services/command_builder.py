@@ -11,6 +11,7 @@ from app.state import AppState
 class CommandSpec:
     label: str
     argv: list[str]
+    workdir: Path | None = None
 
     def render(self) -> str:
         return " ".join(quote(part) for part in self.argv)
@@ -21,6 +22,9 @@ def build_command_specs(state: AppState) -> list[CommandSpec]:
     lookup_root = str(state.lookup_root)
     phase_space_file = str(state.phase_space_file)
     output_dir = str(state.output_dir)
+
+    if state.approach == "amf":
+        return _build_amf_command_specs(state)
 
     if state.approach == "spectrum":
         if state.spectrum_family == "Cartechini":
@@ -95,6 +99,117 @@ def build_command_specs(state: AppState) -> list[CommandSpec]:
     return []
 
 
+def _build_amf_command_specs(state: AppState) -> list[CommandSpec]:
+    commands: list[CommandSpec] = []
+
+    if state.amf_run_mode == "full":
+        run_dir = state.amf_full_simulation_file.parent
+        _append_copy_command(
+            commands,
+            "Stage AMF tsed.dat",
+            state.lookup_root / "AMF" / "tsed.dat",
+            run_dir / "tsed.dat",
+            run_dir,
+        )
+        if state.amf_stopping_power == "ExternalTable":
+            _append_copy_command(
+                commands,
+                "Stage AMF external stopping-power table",
+                state.amf_external_stopping_power_file,
+                run_dir / "StoppingPower.txt",
+                run_dir,
+            )
+        commands.append(
+            CommandSpec(
+                label="Run AMF full simulation",
+                argv=[
+                    str(state.topas_executable_path),
+                    str(state.amf_full_simulation_file),
+                ],
+                workdir=run_dir,
+            )
+        )
+        return commands
+
+    commands.append(
+        CommandSpec(
+            label="Create AMF staged run directory",
+            argv=["/bin/mkdir", "-p", str(state.amf_staged_run_dir)],
+            workdir=state.build_workdir,
+        )
+    )
+
+    if state.amf_stopping_power == "ExternalTable":
+        _append_copy_command(
+            commands,
+            "Stage AMF external stopping-power table",
+            state.amf_external_stopping_power_file,
+            state.amf_staged_run_dir / "StoppingPower.txt",
+            state.build_workdir,
+        )
+
+    amf_args = [
+        str(state.executable_path),
+        "AMF-run",
+        str(state.topas_executable_path),
+        str(state.lookup_root),
+        str(state.amf_phase_space_base),
+        str(state.amf_staged_run_dir),
+        state.amf_quantity,
+        "--detector",
+        state.amf_detector,
+        "--domain-radius",
+        f"{state.amf_domain_radius_um:g}",
+        "--stopping-power",
+        state.amf_stopping_power,
+        "--step-calculator",
+        state.amf_step_calculator,
+        "--world-half-length-cm",
+        f"{state.amf_world_half_length_cm:g}",
+        "--scoring-x-mm",
+        f"{state.amf_scoring_x_mm:g}",
+        "--scoring-y-mm",
+        f"{state.amf_scoring_y_mm:g}",
+        "--scoring-z-mm",
+        f"{state.amf_scoring_z_mm:g}",
+    ]
+    if state.amf_disable_phase_space_precheck:
+        amf_args.append("--no-phase-space-precheck")
+    else:
+        amf_args.append("--phase-space-precheck")
+
+    commands.append(
+        CommandSpec(
+            label="Run AMF phase-space replay",
+            argv=amf_args,
+            workdir=state.build_workdir,
+        )
+    )
+    return commands
+
+
+def _append_copy_command(
+    commands: list[CommandSpec],
+    label: str,
+    source: Path,
+    destination: Path,
+    workdir: Path,
+) -> None:
+    if _same_path(source, destination):
+        return
+    commands.append(
+        CommandSpec(
+            label=label,
+            argv=["/bin/cp", str(source), str(destination)],
+            workdir=workdir,
+        )
+    )
+
+
+def _same_path(left: Path, right: Path) -> bool:
+    return left.resolve(strict=False) == right.resolve(strict=False)
+
+
 def render_command_preview(state: AppState) -> str:
     commands = build_command_specs(state)
     if not commands:
@@ -103,6 +218,9 @@ def render_command_preview(state: AppState) -> str:
 
 
 def planned_output_files(state: AppState) -> list[Path]:
+    if state.approach == "amf":
+        return _planned_amf_output_files(state)
+
     output_dir = state.output_dir
 
     if state.approach is None:
@@ -122,4 +240,29 @@ def planned_output_files(state: AppState) -> list[Path]:
         files.append(output_dir / "magini_summary.csv")
     if state.enable_inaniwa:
         files.append(output_dir / "inaniwa_summary.csv")
+    return files
+
+
+def _planned_amf_output_files(state: AppState) -> list[Path]:
+    if state.amf_run_mode == "full":
+        run_dir = state.amf_full_simulation_file.parent
+        return [
+            run_dir / "tsed.dat",
+            run_dir / "StoppingPower.txt",
+        ] if state.amf_stopping_power == "ExternalTable" else [run_dir / "tsed.dat"]
+
+    run_dir = state.amf_staged_run_dir
+    output_stem = f"{state.amf_phase_space_base.name}_{state.amf_quantity}"
+    files = [
+        run_dir / "amf_run_manifest.txt",
+        run_dir / "replay_amf.txt",
+        run_dir / "topas_stdout.log",
+        run_dir / "topas_stderr.log",
+    ]
+    if state.amf_quantity == "AMFSpectra":
+        files.append(run_dir / f"{output_stem}_MicrodosimetricSpectra.csv")
+    else:
+        files.append(run_dir / f"{output_stem}.csv")
+    if state.amf_stopping_power == "ExternalTable":
+        files.append(run_dir / "StoppingPower.txt")
     return files

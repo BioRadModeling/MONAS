@@ -57,7 +57,7 @@ class ProcessRunner(QObject):
 
         command = self._commands[self._current_index]
         self.commandStarted.emit(command.render())
-        self._process.setWorkingDirectory(str(self._workdir))
+        self._process.setWorkingDirectory(str(command.workdir or self._workdir))
         self._process.start(command.argv[0], command.argv[1:])
 
     def _handle_stdout(self) -> None:

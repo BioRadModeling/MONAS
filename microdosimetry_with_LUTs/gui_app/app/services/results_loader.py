@@ -28,13 +28,14 @@ class LoadedResults:
     let_rows: list[list[str]] = field(default_factory=list)
     magini_pairs: list[tuple[str, str]] = field(default_factory=list)
     inaniwa_pairs: list[tuple[str, str]] = field(default_factory=list)
+    amf_pairs: list[tuple[str, str]] = field(default_factory=list)
     file_paths: list[Path] = field(default_factory=list)
     file_previews: dict[str, str] = field(default_factory=dict)
 
 
 class ResultsLoader:
     def load(self, state: AppState) -> LoadedResults:
-        output_dir = state.output_dir
+        output_dir = self._effective_output_dir(state)
         loaded = LoadedResults()
 
         if not output_dir.exists():
@@ -49,6 +50,10 @@ class ResultsLoader:
             str(path): self._preview_file(path) for path in loaded.file_paths
         }
         loaded.preferred_metric_files = self._preferred_metric_files(loaded.file_paths, state, phase_space_token)
+
+        if state.approach == "amf":
+            self._load_amf_results(loaded, output_dir, state)
+            return loaded
 
         spectrum_path = self._resolve_output_file(output_dir, "poly_spectrum", state, phase_space_token)
         let_path = self._resolve_output_file(output_dir, "let_summary", state, phase_space_token)
@@ -70,6 +75,81 @@ class ResultsLoader:
             state,
         )
         return loaded
+
+    def _load_amf_results(
+        self,
+        loaded: LoadedResults,
+        output_dir: Path,
+        state: AppState,
+    ) -> None:
+        if state.amf_run_mode == "replay":
+            output_stem = f"{state.amf_phase_space_base.name}_{state.amf_quantity}"
+        else:
+            output_stem = state.amf_full_simulation_file.stem
+
+        if state.amf_quantity == "AMFSpectra":
+            spectrum_path = self._resolve_amf_spectrum_file(output_dir, output_stem)
+            loaded.spectrum_file = spectrum_path if spectrum_path.exists() else None
+            loaded.spectrum_summary_text, loaded.spectrum_points = self._load_amf_spectrum(spectrum_path)
+            loaded.preferred_file = spectrum_path if spectrum_path.exists() else None
+            loaded.amf_pairs = [
+                ("Quantity", state.amf_quantity),
+                ("Detector", state.amf_detector),
+                ("Domain radius [um]", f"{state.amf_domain_radius_um:g}"),
+                ("Spectrum file", str(spectrum_path) if spectrum_path.exists() else "Not found"),
+            ]
+            return
+
+        scalar_path = self._resolve_amf_scalar_file(output_dir, output_stem, state.amf_quantity)
+        value = self._load_amf_scalar(scalar_path)
+        loaded.preferred_file = scalar_path if scalar_path.exists() else None
+        loaded.amf_pairs = [
+            ("Quantity", state.amf_quantity),
+            ("Detector", state.amf_detector),
+            ("Domain radius [um]", f"{state.amf_domain_radius_um:g}"),
+            ("Result file", str(scalar_path) if scalar_path.exists() else "Not found"),
+            ("Value", value if value is not None else "No numeric result found"),
+        ]
+
+    def _effective_output_dir(self, state: AppState) -> Path:
+        if state.approach != "amf":
+            return state.output_dir
+        if state.amf_run_mode == "replay":
+            return state.amf_staged_run_dir
+        return state.amf_full_simulation_file.parent
+
+    def _resolve_amf_spectrum_file(self, output_dir: Path, output_stem: str) -> Path:
+        exact = output_dir / f"{output_stem}_MicrodosimetricSpectra.csv"
+        if exact.exists():
+            return exact
+
+        named = output_dir / "AMF_Spectra_MicrodosimetricSpectra.csv"
+        if named.exists():
+            return named
+
+        matches = sorted(output_dir.glob("*MicrodosimetricSpectra.csv"))
+        if matches:
+            return matches[0]
+        return exact
+
+    def _resolve_amf_scalar_file(
+        self,
+        output_dir: Path,
+        output_stem: str,
+        quantity: str,
+    ) -> Path:
+        exact = output_dir / f"{output_stem}.csv"
+        if exact.exists():
+            return exact
+
+        named = output_dir / f"{quantity}.csv"
+        if named.exists():
+            return named
+
+        matches = sorted(output_dir.glob(f"*{quantity}*.csv"))
+        if matches:
+            return matches[0]
+        return exact
 
     def _resolve_output_file(
         self,
@@ -126,6 +206,64 @@ class ResultsLoader:
         )
         return summary, points
 
+    def _load_amf_spectrum(self, path: Path) -> tuple[str, list[SpectrumPoint]]:
+        if not path.exists():
+            return ("No AMF microdosimetric spectra CSV found in the selected output directory.", [])
+
+        rows = self._read_csv_rows(path)
+        if len(rows) < 2:
+            scorer_total = self._load_amf_scalar(path.with_name(path.name.replace("_MicrodosimetricSpectra", "")))
+            total_text = f" Scorer total: {scorer_total}." if scorer_total is not None else ""
+            return (
+                "AMF spectra CSV exists but contains no spectra data row."
+                f"{total_text} Check that the replay detector overlaps the phase-space plane.",
+                [],
+            )
+
+        y_headers = rows[0][3:]
+        value_row = rows[1][3:]
+        points: list[SpectrumPoint] = []
+        for y_text, value_text in zip(y_headers, value_row):
+            try:
+                y_value = float(y_text)
+                yd_value = float(value_text)
+            except ValueError:
+                continue
+            points.append(
+                SpectrumPoint(
+                    y_keV_per_um=y_value,
+                    f_y=0.0,
+                    yf_y=0.0,
+                    d_y=0.0,
+                    yd_y=yd_value,
+                )
+            )
+
+        if not points:
+            return ("AMF spectra CSV was found, but no numeric y bins could be loaded.", [])
+
+        summary = (
+            "AMF spectrum summary\n\n"
+            f"Bins: {len(points):,}\n"
+            f"y range: {points[0].y_keV_per_um:.6g} to {points[-1].y_keV_per_um:.6g} keV/um\n"
+            f"First yd(y): {points[0].yd_y:.6g}\n"
+        )
+        return summary, points
+
+    def _load_amf_scalar(self, path: Path) -> str | None:
+        if not path.exists():
+            return None
+
+        try:
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"):
+                    parts = [part.strip() for part in re.split(r"[,\s]+", stripped) if part.strip()]
+                    return parts[-1] if parts else stripped
+        except OSError:
+            return None
+        return None
+
     def _load_csv_table(self, path: Path) -> tuple[list[str], list[list[str]]]:
         if not path.exists():
             return [], []
@@ -140,6 +278,10 @@ class ResultsLoader:
         headers = rows[0]
         body = rows[1:]
         return headers, body
+
+    def _read_csv_rows(self, path: Path) -> list[list[str]]:
+        with path.open("r", encoding="utf-8", errors="replace", newline="") as handle:
+            return [row for row in csv.reader(handle) if row and not row[0].startswith("#")]
 
     def _load_key_value_summary(self, path: Path) -> list[tuple[str, str]]:
         if not path.exists():
@@ -227,6 +369,16 @@ class ResultsLoader:
             or name.startswith("poly_spectrum_moments")
             or name.startswith("proton_matches")
             or "_vs_y_" in name
+        ):
+            group_score = 0
+        elif state.approach == "amf" and (
+            name.startswith("amf_")
+            or name.startswith("replay_amf")
+            or name.startswith("topas_")
+            or "amfspectra" in name
+            or "amf_yd" in name
+            or "amf_ys" in name
+            or name == "tsed.dat"
         ):
             group_score = 0
         elif state.approach == "means" and (

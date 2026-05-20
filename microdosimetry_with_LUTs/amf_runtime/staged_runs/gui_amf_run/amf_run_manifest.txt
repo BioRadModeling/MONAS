@@ -1,0 +1,27 @@
+AMF staged run manifest
+run_directory = "/Users/kylediamond/MONAS/microdosimetry_with_LUTs/amf_runtime/staged_runs/gui_amf_run"
+parameter_file = "/Users/kylediamond/MONAS/microdosimetry_with_LUTs/amf_runtime/staged_runs/gui_amf_run/replay_amf.txt"
+manifest_file = "/Users/kylediamond/MONAS/microdosimetry_with_LUTs/amf_runtime/staged_runs/gui_amf_run/amf_run_manifest.txt"
+tsed_dat = "/Users/kylediamond/MONAS/microdosimetry_with_LUTs/amf_runtime/staged_runs/gui_amf_run/tsed.dat"
+phase_space = "/Users/kylediamond/MONAS/microdosimetry_with_LUTs/amf_runtime/staged_runs/gui_amf_run/PhaseSpace_curved_33mm.phsp"
+phase_space_header = "/Users/kylediamond/MONAS/microdosimetry_with_LUTs/amf_runtime/staged_runs/gui_amf_run/PhaseSpace_curved_33mm.header"
+quantity = AMFSpectra
+output_file = PhaseSpace_curved_33mm_AMFSpectra
+detector = water
+scoring_component = AMFScoringVolume
+scoring_material = G4_WATER
+world_half_length_cm = 148.79
+scoring_half_length_x_mm = 50
+scoring_half_length_y_mm = 50
+scoring_half_length_z_mm = 0.5
+scoring_radius_mm = 6.35
+scoring_trans_x_mm = 0
+scoring_trans_y_mm = 0
+scoring_trans_z_mm = -1387.4
+domain_radius_um = 0.28
+nucleus_radius_um = 3.9
+beta_ref_per_gy2 = 0.0615
+electron_cut_m = 1000
+stopping_power = Topas
+step_calculator = MidStep
+phase_space_pre_check = False

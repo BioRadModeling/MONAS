@@ -66,6 +66,10 @@ class ResultsPanel(QWidget):
         layout.addWidget(self.tabs)
 
         self.tabs.addTab(self._build_overview_tab(), "Overview")
+
+        self.amf_table = self._build_key_value_table()
+        self.tabs.addTab(self.amf_table, "AMF")
+
         self.tabs.addTab(self._build_spectrum_tab(), "Spectrum")
 
         self.let_table = QTableWidget()
@@ -317,6 +321,7 @@ class ResultsPanel(QWidget):
         self._populate_table(self.let_table, loaded.let_headers, loaded.let_rows)
         self._populate_key_value_table(self.magini_table, loaded.magini_pairs)
         self._populate_key_value_table(self.inaniwa_table, loaded.inaniwa_pairs)
+        self._populate_key_value_table(self.amf_table, loaded.amf_pairs)
         self.set_loaded_files(loaded.file_paths, loaded.file_previews)
 
     def set_loaded_files(self, paths: list[Path], previews: dict[str, str]) -> None:

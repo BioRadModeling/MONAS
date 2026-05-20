@@ -93,6 +93,8 @@ class MainWindow(QMainWindow):
 
         detail_lines: list[str] = []
         approach_line = "No analysis approach selected yet."
+        phase_space_display = str(state.phase_space_file)
+        output_display = str(state.output_dir)
         if state.approach == "spectrum":
             approach_line = f"Full microdosimetric spectrum via {state.spectrum_family}."
             if state.spectrum_family == "DeCunha":
@@ -115,15 +117,31 @@ class MainWindow(QMainWindow):
             detail_lines.append(
                 "Enabled mean-value modes: " + (", ".join(enabled) if enabled else "none")
             )
+        elif state.approach == "amf":
+            if state.amf_run_mode == "replay":
+                approach_line = "AMF phase-space replay."
+                phase_space_display = str(state.amf_phase_space_base)
+                output_display = str(state.amf_staged_run_dir)
+            else:
+                approach_line = "AMF full simulation."
+                phase_space_display = str(state.amf_full_simulation_file)
+                output_display = str(state.amf_full_simulation_file.parent)
+            detail_lines.extend(
+                [
+                    f"Quantity={state.amf_quantity}, detector={state.amf_detector}, domain radius={state.amf_domain_radius_um:g} um",
+                    f"Stopping power={state.amf_stopping_power}, step calculator={state.amf_step_calculator}",
+                    f"Scoring position=({state.amf_scoring_x_mm:g}, {state.amf_scoring_y_mm:g}, {state.amf_scoring_z_mm:g}) mm",
+                ]
+            )
 
         self.results_panel.set_overview_data(
             OverviewData(
                 run_status=self._run_status,
                 approach=approach_line,
                 details=detail_lines,
-                phase_space_file=str(state.phase_space_file),
+                phase_space_file=phase_space_display,
                 lookup_root=str(state.lookup_root),
-                output_dir=str(state.output_dir),
+                output_dir=output_display,
                 planned_outputs=[path.name for path in outputs],
                 available_outputs=[path.name for path in self._loaded_results.file_paths],
                 history=list(reversed(self.run_history)),
@@ -200,6 +218,13 @@ class MainWindow(QMainWindow):
                 enabled.append("Inaniwa")
             return "Mean values only: " + (", ".join(enabled) if enabled else "no summary mode selected")
 
+        if state.approach == "amf":
+            mode = "replay" if state.amf_run_mode == "replay" else "full simulation"
+            return (
+                f"AMF {mode}: {state.amf_quantity}, "
+                f"{state.amf_detector}, {state.amf_domain_radius_um:g} um"
+            )
+
         return "No analysis approach selected"
 
     def _apply_stylesheet(self) -> None:
@@ -232,13 +257,13 @@ class MainWindow(QMainWindow):
                 font-weight: 700;
                 text-transform: uppercase;
             }
-            QPlainTextEdit, QLineEdit, QComboBox, QSpinBox, QListWidget {
+            QPlainTextEdit, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QListWidget {
                 background: #fffdf8;
                 border: 1px solid #d8d0c4;
                 border-radius: 8px;
                 padding: 6px;
             }
-            QComboBox, QSpinBox {
+            QComboBox, QSpinBox, QDoubleSpinBox {
                 padding-top: 4px;
                 padding-bottom: 4px;
             }

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
+import shutil
 
 from app.state import AppState
 
@@ -49,6 +50,9 @@ class InputChecker:
         self._spectrum_range_cache: dict[Path, tuple[float, float] | None] = {}
 
     def run(self, state: AppState) -> InputCheckResult:
+        if state.approach == "amf":
+            return self._run_amf_check(state)
+
         errors: list[str] = []
         warnings: list[str] = []
 
@@ -97,6 +101,83 @@ class InputChecker:
             status="warning" if warnings else "ready",
             status_text="Warnings present" if warnings else "Ready",
             summary_text=self._format_summary_text(scan),
+            species_text=species_text,
+            warnings_text="\n\n".join(warnings) if warnings else "No blocking issues detected.",
+        )
+
+    def _run_amf_check(self, state: AppState) -> InputCheckResult:
+        errors: list[str] = []
+        warnings: list[str] = []
+
+        if not state.lookup_root.exists():
+            errors.append(f"Lookup root not found: {state.lookup_root}")
+        if not (state.lookup_root / "AMF" / "tsed.dat").exists():
+            errors.append(f"AMF tsed.dat not found: {state.lookup_root / 'AMF' / 'tsed.dat'}")
+        if not state.executable_path.exists():
+            errors.append(f"MONAS executable not found: {state.executable_path}")
+        if not self._is_executable_available(state.topas_executable_path):
+            errors.append(f"TOPAS executable not found: {state.topas_executable_path}")
+        if not 0.0015 <= state.amf_domain_radius_um <= 0.5:
+            errors.append("AMF domain radius must be between 0.0015 um and 0.5 um.")
+
+        if state.amf_stopping_power == "ExternalTable":
+            if not state.amf_external_stopping_power_file.exists():
+                errors.append(
+                    f"External stopping-power table not found: {state.amf_external_stopping_power_file}"
+                )
+            elif state.amf_external_stopping_power_file.name != "StoppingPower.txt":
+                warnings.append(
+                    "The selected external stopping-power table will be copied as StoppingPower.txt in the TOPAS run directory."
+                )
+
+        scan: PhaseSpaceScan | None = None
+        species_text = ""
+
+        if state.amf_run_mode == "replay":
+            phase_space_file = state.amf_phase_space_base.with_suffix(".phsp")
+            header_file = state.amf_phase_space_base.with_suffix(".header")
+            if not phase_space_file.exists():
+                errors.append(f"AMF phase-space file not found: {phase_space_file}")
+            if not header_file.exists():
+                errors.append(f"AMF phase-space header not found: {header_file}")
+            if not state.amf_staged_run_dir.parent.exists():
+                errors.append(
+                    f"AMF staged run parent directory does not exist: {state.amf_staged_run_dir.parent}"
+                )
+
+            if phase_space_file.exists():
+                scan = self._scan_phase_space(phase_space_file)
+                species_text = self._format_species_text(scan)
+                if scan.charged_rows == 0:
+                    warnings.append("No charged rows were found in the selected AMF phase-space file.")
+            if state.amf_disable_phase_space_precheck:
+                warnings.append("TOPAS phase-space precheck will be disabled for replay.")
+        else:
+            if not state.amf_full_simulation_file.exists():
+                errors.append(
+                    f"AMF full simulation TOPAS file not found: {state.amf_full_simulation_file}"
+                )
+            if not state.amf_full_simulation_file.parent.exists():
+                errors.append(
+                    f"AMF full simulation directory does not exist: {state.amf_full_simulation_file.parent}"
+                )
+            warnings.append(
+                "Full simulation runs the selected TOPAS file directly; the file should already contain the AMF detector and scorer block."
+            )
+
+        if errors:
+            return InputCheckResult(
+                status="error",
+                status_text="Errors found",
+                summary_text=self._format_amf_summary_text(state, scan),
+                species_text=species_text,
+                warnings_text="\n\n".join(errors + warnings),
+            )
+
+        return InputCheckResult(
+            status="warning" if warnings else "ready",
+            status_text="Warnings present" if warnings else "Ready",
+            summary_text=self._format_amf_summary_text(state, scan),
             species_text=species_text,
             warnings_text="\n\n".join(warnings) if warnings else "No blocking issues detected.",
         )
@@ -259,6 +340,34 @@ class InputChecker:
         parts = [f"{element} {scan.species_counts.get(element, 0):,}" for element in LET_ELEMENTS]
         parts.append(f"Unsupported charged species {scan.unsupported_charged_rows:,}")
         return "   ".join(parts)
+
+    @staticmethod
+    def _format_amf_summary_text(
+        state: AppState,
+        scan: PhaseSpaceScan | None,
+    ) -> str:
+        lines = [
+            f"AMF mode: {'phase-space replay' if state.amf_run_mode == 'replay' else 'full simulation'}",
+            f"Quantity: {state.amf_quantity}",
+            f"Detector: {state.amf_detector}",
+            f"Domain radius: {state.amf_domain_radius_um:g} um",
+            f"Stopping power: {state.amf_stopping_power}",
+            f"Scoring position: ({state.amf_scoring_x_mm:g}, {state.amf_scoring_y_mm:g}, {state.amf_scoring_z_mm:g}) mm",
+        ]
+        if scan is not None:
+            lines.extend(
+                [
+                    f"Charged rows: {scan.charged_rows:,}",
+                    f"Proton rows: {scan.proton_rows:,}",
+                ]
+            )
+        return "\n".join(lines)
+
+    @staticmethod
+    def _is_executable_available(path: Path) -> bool:
+        if path.is_absolute() or path.parent != Path("."):
+            return path.exists()
+        return shutil.which(str(path)) is not None
 
 
 def decode_particle_identity(pdg_code: int) -> ParticleIdentity:

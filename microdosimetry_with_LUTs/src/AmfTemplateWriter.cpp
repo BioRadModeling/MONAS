@@ -135,6 +135,8 @@ void writeScorer(std::ostream& out, const AmfConfig& config) {
         << config.scoringComponent << "\"\n";
     out << "s:Sc/" << scorerName << "/OutputFile = \""
         << config.outputFile << "\"\n";
+    out << "s:Sc/" << scorerName
+        << "/IfOutputFileAlreadyExists = \"Overwrite\"\n";
     out << "d:Sc/" << scorerName << "/DomainRadius = "
         << config.domainRadiusUm << " um\n";
 

@@ -21,6 +21,22 @@ class AppState:
     enable_let: bool = True
     enable_magini: bool = True
     enable_inaniwa: bool = True
+    topas_executable_path: Path = Path("topas")
+    amf_run_mode: str = "replay"
+    amf_quantity: str = "AMFSpectra"
+    amf_detector: str = "water"
+    amf_domain_radius_um: float = 0.28
+    amf_stopping_power: str = "Topas"
+    amf_step_calculator: str = "MidStep"
+    amf_phase_space_base: Path = Path()
+    amf_staged_run_dir: Path = Path()
+    amf_full_simulation_file: Path = Path()
+    amf_external_stopping_power_file: Path = Path()
+    amf_disable_phase_space_precheck: bool = True
+    amf_world_half_length_cm: float = 148.79
+    amf_scoring_x_mm: float = 0.0
+    amf_scoring_y_mm: float = 0.0
+    amf_scoring_z_mm: float = -1387.4
 
     def clone(self) -> "AppState":
         return replace(self)
@@ -33,4 +49,8 @@ def default_app_state(project_root: Path) -> AppState:
         output_dir=project_root / "output" / "gui_run_33mm",
         executable_path=project_root / "build" / "microdosimetry_with_LUTs",
         build_workdir=project_root / "build",
+        amf_phase_space_base=project_root / "input" / "PhaseSpace_curved_33mm",
+        amf_staged_run_dir=project_root / "amf_runtime" / "staged_runs" / "gui_amf_run",
+        amf_full_simulation_file=project_root / "amf_runtime" / "full_simulation_amf.txt",
+        amf_external_stopping_power_file=project_root / "amf_runtime" / "staged_runs" / "gui_amf_run" / "StoppingPower.txt",
     )

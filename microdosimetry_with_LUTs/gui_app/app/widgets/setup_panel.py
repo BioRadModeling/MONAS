@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -50,6 +51,7 @@ class SetupPanel(QWidget):
         root_layout.addWidget(self._build_settings_group())
         root_layout.addWidget(self._build_input_check_group())
         root_layout.addWidget(self._build_approach_group())
+        root_layout.addWidget(self._build_amf_group())
         root_layout.addWidget(self._build_spectrum_group())
         root_layout.addWidget(self._build_means_group())
         root_layout.addWidget(self._build_command_group())
@@ -154,17 +156,151 @@ class SetupPanel(QWidget):
 
         self.approach_group = QButtonGroup(self)
         self.no_approach_radio = QRadioButton("No approach selected yet")
+        self.amf_radio = QRadioButton("AMF")
         self.spectrum_radio = QRadioButton("Full microdosimetric spectrum")
         self.means_radio = QRadioButton("Mean values only")
 
         self.approach_group.addButton(self.no_approach_radio)
+        self.approach_group.addButton(self.amf_radio)
         self.approach_group.addButton(self.spectrum_radio)
         self.approach_group.addButton(self.means_radio)
 
-        for widget in (self.no_approach_radio, self.spectrum_radio, self.means_radio):
+        for widget in (
+            self.no_approach_radio,
+            self.amf_radio,
+            self.spectrum_radio,
+            self.means_radio,
+        ):
             widget.toggled.connect(self._sync_state_from_widgets)
             layout.addWidget(widget)
         return group
+
+    def _build_amf_group(self) -> QGroupBox:
+        group = QGroupBox("AMF Configuration")
+        layout = QVBoxLayout(group)
+
+        grid = QGridLayout()
+        self.amf_run_mode_combo = QComboBox()
+        self.amf_run_mode_combo.addItem("Phase-space replay", "replay")
+        self.amf_run_mode_combo.addItem("Full simulation", "full")
+        self.amf_quantity_combo = QComboBox()
+        self.amf_quantity_combo.addItems(["AMFSpectra", "AMF_yD", "AMF_yS"])
+        self.amf_detector_combo = QComboBox()
+        self.amf_detector_combo.addItems(["water", "silicon", "TEgas"])
+        self.amf_domain_radius_spin = QDoubleSpinBox()
+        self.amf_domain_radius_spin.setRange(0.0015, 0.5)
+        self.amf_domain_radius_spin.setDecimals(4)
+        self.amf_domain_radius_spin.setSingleStep(0.01)
+        self.amf_domain_radius_spin.setSuffix(" um")
+        self.amf_stopping_power_combo = QComboBox()
+        self.amf_stopping_power_combo.addItems(["Topas", "ExternalTable"])
+        self.amf_step_calculator_combo = QComboBox()
+        self.amf_step_calculator_combo.addItems(["MidStep", "PreStep"])
+        self.amf_precheck_checkbox = QCheckBox("Disable phase-space precheck")
+        self.amf_world_half_length_spin = QDoubleSpinBox()
+        self.amf_world_half_length_spin.setRange(1.0, 10_000.0)
+        self.amf_world_half_length_spin.setDecimals(3)
+        self.amf_world_half_length_spin.setSingleStep(1.0)
+        self.amf_world_half_length_spin.setSuffix(" cm")
+        self.amf_scoring_x_spin = self._build_mm_spin()
+        self.amf_scoring_y_spin = self._build_mm_spin()
+        self.amf_scoring_z_spin = self._build_mm_spin()
+
+        grid.addWidget(QLabel("Run mode"), 0, 0)
+        grid.addWidget(self.amf_run_mode_combo, 0, 1)
+        grid.addWidget(QLabel("Quantity"), 1, 0)
+        grid.addWidget(self.amf_quantity_combo, 1, 1)
+        grid.addWidget(QLabel("Detector"), 2, 0)
+        grid.addWidget(self.amf_detector_combo, 2, 1)
+        grid.addWidget(QLabel("Domain radius"), 3, 0)
+        grid.addWidget(self.amf_domain_radius_spin, 3, 1)
+        grid.addWidget(QLabel("Stopping power"), 4, 0)
+        grid.addWidget(self.amf_stopping_power_combo, 4, 1)
+        grid.addWidget(QLabel("Step calculator"), 5, 0)
+        grid.addWidget(self.amf_step_calculator_combo, 5, 1)
+        grid.addWidget(self.amf_precheck_checkbox, 6, 1)
+        grid.addWidget(QLabel("World half length"), 7, 0)
+        grid.addWidget(self.amf_world_half_length_spin, 7, 1)
+        grid.addWidget(QLabel("Scoring X"), 8, 0)
+        grid.addWidget(self.amf_scoring_x_spin, 8, 1)
+        grid.addWidget(QLabel("Scoring Y"), 9, 0)
+        grid.addWidget(self.amf_scoring_y_spin, 9, 1)
+        grid.addWidget(QLabel("Scoring Z"), 10, 0)
+        grid.addWidget(self.amf_scoring_z_spin, 10, 1)
+        grid.setColumnStretch(1, 1)
+        layout.addLayout(grid)
+
+        paths_form = QFormLayout()
+        self.topas_executable_edit = QLineEdit()
+        self.topas_executable_edit.setReadOnly(True)
+        self.amf_phase_space_base_edit = QLineEdit()
+        self.amf_phase_space_base_edit.setReadOnly(True)
+        self.amf_staged_run_dir_edit = QLineEdit()
+        self.amf_staged_run_dir_edit.setReadOnly(True)
+        self.amf_full_simulation_file_edit = QLineEdit()
+        self.amf_full_simulation_file_edit.setReadOnly(True)
+        self.amf_external_stopping_power_edit = QLineEdit()
+        self.amf_external_stopping_power_edit.setReadOnly(True)
+
+        self.amf_replay_base_row = self._row_with_browse(
+            self.amf_phase_space_base_edit,
+            self._choose_amf_phase_space_base,
+        )
+        self.amf_staged_dir_row = self._row_with_browse(
+            self.amf_staged_run_dir_edit,
+            self._choose_amf_staged_run_dir,
+        )
+        self.amf_full_simulation_row = self._row_with_browse(
+            self.amf_full_simulation_file_edit,
+            self._choose_amf_full_simulation_file,
+        )
+        self.amf_external_stopping_power_row = self._row_with_browse(
+            self.amf_external_stopping_power_edit,
+            self._choose_amf_external_stopping_power_file,
+        )
+
+        self.amf_paths_form = paths_form
+        paths_form.addRow(
+            "TOPAS executable",
+            self._row_with_browse(self.topas_executable_edit, self._choose_topas_executable),
+        )
+        paths_form.addRow("Phase-space base", self.amf_replay_base_row)
+        paths_form.addRow("Staged run directory", self.amf_staged_dir_row)
+        paths_form.addRow("Full simulation file", self.amf_full_simulation_row)
+        paths_form.addRow("StoppingPower.txt", self.amf_external_stopping_power_row)
+        self.amf_replay_base_label = paths_form.labelForField(self.amf_replay_base_row)
+        self.amf_staged_dir_label = paths_form.labelForField(self.amf_staged_dir_row)
+        self.amf_full_simulation_label = paths_form.labelForField(self.amf_full_simulation_row)
+        self.amf_external_stopping_power_label = paths_form.labelForField(
+            self.amf_external_stopping_power_row
+        )
+        layout.addLayout(paths_form)
+
+        for widget in (
+            self.amf_run_mode_combo,
+            self.amf_quantity_combo,
+            self.amf_detector_combo,
+            self.amf_stopping_power_combo,
+            self.amf_step_calculator_combo,
+        ):
+            widget.currentIndexChanged.connect(self._sync_state_from_widgets)
+        self.amf_domain_radius_spin.valueChanged.connect(self._sync_state_from_widgets)
+        self.amf_precheck_checkbox.toggled.connect(self._sync_state_from_widgets)
+        self.amf_world_half_length_spin.valueChanged.connect(self._sync_state_from_widgets)
+        self.amf_scoring_x_spin.valueChanged.connect(self._sync_state_from_widgets)
+        self.amf_scoring_y_spin.valueChanged.connect(self._sync_state_from_widgets)
+        self.amf_scoring_z_spin.valueChanged.connect(self._sync_state_from_widgets)
+
+        self.amf_group_box = group
+        return group
+
+    def _build_mm_spin(self) -> QDoubleSpinBox:
+        spin = QDoubleSpinBox()
+        spin.setRange(-100_000.0, 100_000.0)
+        spin.setDecimals(3)
+        spin.setSingleStep(1.0)
+        spin.setSuffix(" mm")
+        return spin
 
     def _build_spectrum_group(self) -> QGroupBox:
         group = QGroupBox("Spectrum Build")
@@ -315,6 +451,63 @@ class SetupPanel(QWidget):
             self.output_dir_edit.setText(path)
             self._sync_state_from_widgets()
 
+    def _choose_topas_executable(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose TOPAS executable",
+            str(self._state.topas_executable_path.parent),
+            "Executables (*);;All files (*)",
+        )
+        if path:
+            self.topas_executable_edit.setText(path)
+            self._sync_state_from_widgets()
+
+    def _choose_amf_phase_space_base(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose AMF phase-space file",
+            str(self._state.amf_phase_space_base.parent),
+            "Phase-space files (*.phsp *.header);;All files (*)",
+        )
+        if path:
+            selected = Path(path)
+            if selected.suffix in {".phsp", ".header"}:
+                selected = selected.with_suffix("")
+            self.amf_phase_space_base_edit.setText(str(selected))
+            self._sync_state_from_widgets()
+
+    def _choose_amf_staged_run_dir(self) -> None:
+        path = QFileDialog.getExistingDirectory(
+            self,
+            "Choose AMF staged run directory",
+            str(self._state.amf_staged_run_dir.parent),
+        )
+        if path:
+            self.amf_staged_run_dir_edit.setText(path)
+            self._sync_state_from_widgets()
+
+    def _choose_amf_full_simulation_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose AMF full simulation TOPAS file",
+            str(self._state.amf_full_simulation_file.parent),
+            "TOPAS parameter files (*.txt);;All files (*)",
+        )
+        if path:
+            self.amf_full_simulation_file_edit.setText(path)
+            self._sync_state_from_widgets()
+
+    def _choose_amf_external_stopping_power_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose external stopping-power table",
+            str(self._state.amf_external_stopping_power_file.parent),
+            "Text files (*.txt);;All files (*)",
+        )
+        if path:
+            self.amf_external_stopping_power_edit.setText(path)
+            self._sync_state_from_widgets()
+
     def _show_preview_hint(self) -> None:
         QMessageBox.information(
             self,
@@ -334,6 +527,7 @@ class SetupPanel(QWidget):
         self.output_dir_edit.setText(str(state.output_dir))
 
         self.no_approach_radio.setChecked(state.approach is None)
+        self.amf_radio.setChecked(state.approach == "amf")
         self.spectrum_radio.setChecked(state.approach == "spectrum")
         self.means_radio.setChecked(state.approach == "means")
 
@@ -349,12 +543,31 @@ class SetupPanel(QWidget):
         self.magini_checkbox.setChecked(state.enable_magini)
         self.inaniwa_checkbox.setChecked(state.enable_inaniwa)
 
+        self.topas_executable_edit.setText(str(state.topas_executable_path))
+        self.amf_run_mode_combo.setCurrentIndex(self.amf_run_mode_combo.findData(state.amf_run_mode))
+        self.amf_quantity_combo.setCurrentText(state.amf_quantity)
+        self.amf_detector_combo.setCurrentText(state.amf_detector)
+        self.amf_domain_radius_spin.setValue(state.amf_domain_radius_um)
+        self.amf_stopping_power_combo.setCurrentText(state.amf_stopping_power)
+        self.amf_step_calculator_combo.setCurrentText(state.amf_step_calculator)
+        self.amf_phase_space_base_edit.setText(str(state.amf_phase_space_base))
+        self.amf_staged_run_dir_edit.setText(str(state.amf_staged_run_dir))
+        self.amf_full_simulation_file_edit.setText(str(state.amf_full_simulation_file))
+        self.amf_external_stopping_power_edit.setText(str(state.amf_external_stopping_power_file))
+        self.amf_precheck_checkbox.setChecked(state.amf_disable_phase_space_precheck)
+        self.amf_world_half_length_spin.setValue(state.amf_world_half_length_cm)
+        self.amf_scoring_x_spin.setValue(state.amf_scoring_x_mm)
+        self.amf_scoring_y_spin.setValue(state.amf_scoring_y_mm)
+        self.amf_scoring_z_spin.setValue(state.amf_scoring_z_mm)
+
         self._refresh_visibility()
         self._update_command_preview()
         self.stateChanged.emit(self.current_state())
 
     def _sync_state_from_widgets(self) -> None:
-        if self.spectrum_radio.isChecked():
+        if self.amf_radio.isChecked():
+            approach = "amf"
+        elif self.spectrum_radio.isChecked():
             approach = "spectrum"
         elif self.means_radio.isChecked():
             approach = "means"
@@ -376,12 +589,29 @@ class SetupPanel(QWidget):
         self._state.enable_let = self.let_checkbox.isChecked()
         self._state.enable_magini = self.magini_checkbox.isChecked()
         self._state.enable_inaniwa = self.inaniwa_checkbox.isChecked()
+        self._state.topas_executable_path = Path(self.topas_executable_edit.text())
+        self._state.amf_run_mode = self.amf_run_mode_combo.currentData()
+        self._state.amf_quantity = self.amf_quantity_combo.currentText()
+        self._state.amf_detector = self.amf_detector_combo.currentText()
+        self._state.amf_domain_radius_um = self.amf_domain_radius_spin.value()
+        self._state.amf_stopping_power = self.amf_stopping_power_combo.currentText()
+        self._state.amf_step_calculator = self.amf_step_calculator_combo.currentText()
+        self._state.amf_phase_space_base = Path(self.amf_phase_space_base_edit.text())
+        self._state.amf_staged_run_dir = Path(self.amf_staged_run_dir_edit.text())
+        self._state.amf_full_simulation_file = Path(self.amf_full_simulation_file_edit.text())
+        self._state.amf_external_stopping_power_file = Path(self.amf_external_stopping_power_edit.text())
+        self._state.amf_disable_phase_space_precheck = self.amf_precheck_checkbox.isChecked()
+        self._state.amf_world_half_length_cm = self.amf_world_half_length_spin.value()
+        self._state.amf_scoring_x_mm = self.amf_scoring_x_spin.value()
+        self._state.amf_scoring_y_mm = self.amf_scoring_y_spin.value()
+        self._state.amf_scoring_z_mm = self.amf_scoring_z_spin.value()
 
         self._refresh_visibility()
         self._update_command_preview()
         self.stateChanged.emit(self.current_state())
 
     def _refresh_visibility(self) -> None:
+        self.amf_group_box.setVisible(self._state.approach == "amf")
         self.spectrum_group_box.setVisible(self._state.approach == "spectrum")
         self.means_group_box.setVisible(self._state.approach == "means")
 
@@ -389,6 +619,17 @@ class SetupPanel(QWidget):
         self.decunha_voxel_combo.setEnabled(decunha_selected)
         self.decunha_grid_combo.setEnabled(decunha_selected)
         self.cartechini_radius_combo.setEnabled(not decunha_selected)
+
+        replay_selected = self._state.amf_run_mode == "replay"
+        self.amf_replay_base_row.setVisible(replay_selected)
+        self.amf_staged_dir_row.setVisible(replay_selected)
+        self.amf_replay_base_label.setVisible(replay_selected)
+        self.amf_staged_dir_label.setVisible(replay_selected)
+        self.amf_full_simulation_row.setVisible(not replay_selected)
+        self.amf_full_simulation_label.setVisible(not replay_selected)
+        external_selected = self._state.amf_stopping_power == "ExternalTable"
+        self.amf_external_stopping_power_row.setVisible(external_selected)
+        self.amf_external_stopping_power_label.setVisible(external_selected)
 
     def _update_command_preview(self) -> None:
         self.command_preview.setPlainText(render_command_preview(self._state))
