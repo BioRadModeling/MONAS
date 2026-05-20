@@ -12,7 +12,7 @@ be added after a manual TOPAS AMF run has been reviewed.
 
 ## What AMF needs
 
-For one AMF replay, provide:
+For one AMF phase-space replay, provide:
 
 - a TOPAS executable with the AMF extension compiled in,
 - a phase-space pair with the same base name, for example
@@ -24,6 +24,11 @@ For one AMF replay, provide:
 The `.header` file is required by TOPAS phase-space replay. This workflow only
 uses it as TOPAS input metadata; it does not trust particle counts in the header
 for dose or spectra calculations.
+
+AMF can also be run during a full TOPAS simulation. In that case, put the AMF
+detector geometry and scorer block directly in the full simulation parameter
+file and run TOPAS normally. `AMF-stage` and `AMF-run` are only helpers for the
+phase-space replay workflow.
 
 ## Build
 
@@ -55,7 +60,8 @@ From `microdosimetry_with_LUTs`:
   lookup_tables \
   input/PhaseSpace_curved_33mm \
   amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD \
-  AMF_yD
+  AMF_yD \
+  --detector water
 ```
 
 Use `AMFSpectra` for the full spectrum, `AMF_yD` for dose-weighted mean lineal
@@ -72,7 +78,8 @@ Pass the TOPAS executable as the first argument.
   lookup_tables \
   input/PhaseSpace_curved_33mm \
   amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD \
-  AMF_yD
+  AMF_yD \
+  --detector water
 ```
 
 After TOPAS exits, the CLI reports the expected AMF output files as `FOUND` or
@@ -234,6 +241,26 @@ d:Sc/AMF/BetaRef = 0.0615 /Gy2
 
 ## Useful options
 
+Choose the detector used in the generated replay parameter file:
+
+```bash
+--detector water
+--detector silicon
+--detector TEgas
+```
+
+The presets are:
+
+- `water`: `10 cm x 10 cm x 1 mm` `G4_WATER` slab named `AMFScoringVolume`.
+- `silicon`: SOI active-layer approximation, `2.93 mm x 3.58 mm x 10 um`
+  `G4_Si` slab named `SOISensitiveLayer`.
+- `TEgas`: `6.35 mm` radius propane-gas sphere named `TEgasSV`.
+
+The detector should match the surface where the phase space was scored. For
+example, a phase space scored on a TEPC gas sphere should be replayed with
+`--detector TEgas`; a phase space scored on a slab face should use the matching
+water or silicon slab geometry.
+
 Override the domain radius:
 
 ```bash
@@ -253,6 +280,12 @@ Move or resize the water scoring volume:
 --scoring-x-mm 0.0 \
 --scoring-y-mm 0.0 \
 --scoring-z-mm 33.0
+```
+
+For the TE-gas sphere, resize the sphere with:
+
+```bash
+--scoring-radius-mm 6.35
 ```
 
 Use AMF's external stopping-power table path instead of TOPAS stopping power:

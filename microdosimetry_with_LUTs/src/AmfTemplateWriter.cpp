@@ -24,13 +24,7 @@ void writeCommonSource(std::ostream& out, const AmfConfig& config) {
         << boolToTopas(config.phaseSpacePreCheck) << "\"\n\n";
 }
 
-void writeGeometryPlaceholder(std::ostream& out, const AmfConfig& config) {
-    out << "# Geometry\n";
-    out << "d:Ge/World/HLX = " << config.worldHalfLengthCm << " cm\n";
-    out << "d:Ge/World/HLY = " << config.worldHalfLengthCm << " cm\n";
-    out << "d:Ge/World/HLZ = " << config.worldHalfLengthCm << " cm\n";
-    out << "s:Ge/World/Material = \"Air\"\n\n";
-
+void writeBoxDetector(std::ostream& out, const AmfConfig& config) {
     out << "s:Ge/" << config.scoringComponent << "/Parent = \"World\"\n";
     out << "s:Ge/" << config.scoringComponent << "/Type = \"TsBox\"\n";
     out << "s:Ge/" << config.scoringComponent << "/Material = \""
@@ -50,6 +44,76 @@ void writeGeometryPlaceholder(std::ostream& out, const AmfConfig& config) {
     out << "d:Ge/" << config.scoringComponent << "/RotX = 0.0 deg\n";
     out << "d:Ge/" << config.scoringComponent << "/RotY = 0.0 deg\n";
     out << "d:Ge/" << config.scoringComponent << "/RotZ = 0.0 deg\n\n";
+}
+
+void writeTEGasMaterial(std::ostream& out, const AmfConfig& config) {
+    if (config.scoringMaterial != "PropaneGas") {
+        return;
+    }
+
+    out << "# Tissue-equivalent propane gas\n";
+    out << "sv:Ma/PropaneGas/Components = 2 \"Hydrogen\" \"Carbon\"\n";
+    out << "uv:Ma/PropaneGas/Fractions = 2 0.182864 0.817136\n";
+    out << "d:Ma/PropaneGas/Density = 0.108 mg/cm3\n\n";
+}
+
+void writeSphereDetector(std::ostream& out, const AmfConfig& config) {
+    out << "s:Ge/" << config.scoringComponent << "/Parent = \"World\"\n";
+    out << "s:Ge/" << config.scoringComponent << "/Type = \"TsSphere\"\n";
+    out << "s:Ge/" << config.scoringComponent << "/Material = \""
+        << config.scoringMaterial << "\"\n";
+    out << "d:Ge/" << config.scoringComponent << "/RMin = 0 mm\n";
+    out << "d:Ge/" << config.scoringComponent << "/RMax = "
+        << config.scoringRadiusMm << " mm\n";
+    out << "d:Ge/" << config.scoringComponent << "/SPhi = 0 deg\n";
+    out << "d:Ge/" << config.scoringComponent << "/DPhi = 360 deg\n";
+    out << "d:Ge/" << config.scoringComponent << "/STheta = 0 deg\n";
+    out << "d:Ge/" << config.scoringComponent << "/DTheta = 180 deg\n";
+    out << "d:Ge/" << config.scoringComponent << "/TransX = "
+        << config.scoringTransXmm << " mm\n";
+    out << "d:Ge/" << config.scoringComponent << "/TransY = "
+        << config.scoringTransYmm << " mm\n";
+    out << "d:Ge/" << config.scoringComponent << "/TransZ = "
+        << config.scoringTransZmm << " mm\n";
+    out << "d:Ge/" << config.scoringComponent << "/RotX = 0.0 deg\n";
+    out << "d:Ge/" << config.scoringComponent << "/RotY = 0.0 deg\n";
+    out << "d:Ge/" << config.scoringComponent << "/RotZ = 0.0 deg\n\n";
+}
+
+void writeGeometryPlaceholder(std::ostream& out, const AmfConfig& config) {
+    out << "# Geometry\n";
+    out << "# Detector preset: "
+        << toAmfDetectorTypeName(config.detectorType) << "\n";
+    out << "d:Ge/World/HLX = " << config.worldHalfLengthCm << " cm\n";
+    out << "d:Ge/World/HLY = " << config.worldHalfLengthCm << " cm\n";
+    out << "d:Ge/World/HLZ = " << config.worldHalfLengthCm << " cm\n";
+    out << "s:Ge/World/Material = \"Air\"\n\n";
+
+    if (config.detectorType == AmfDetectorType::TEGas) {
+        writeTEGasMaterial(out, config);
+        writeSphereDetector(out, config);
+    } else {
+        writeBoxDetector(out, config);
+    }
+}
+
+void writeDetectorNotes(std::ostream& out, const AmfConfig& config) {
+    out << "# Detector notes\n";
+
+    switch (config.detectorType) {
+        case AmfDetectorType::Water:
+            out << "# water: 10 cm x 10 cm x 1 mm G4_WATER slab by default.\n";
+            break;
+        case AmfDetectorType::Silicon:
+            out << "# silicon: SOI active-layer approximation, "
+                << "2.93 mm x 3.58 mm x 10 um G4_Si by default.\n";
+            break;
+        case AmfDetectorType::TEGas:
+            out << "# TEgas: 6.35 mm radius propane-gas sphere by default.\n";
+            break;
+    }
+
+    out << "\n";
 }
 
 void writeElectronCutNote(std::ostream& out, const AmfConfig& config) {
@@ -105,6 +169,7 @@ void AmfTemplateWriter::writeReplayParameterFile(
 
     writeCommonSource(out, config);
     writeGeometryPlaceholder(out, config);
+    writeDetectorNotes(out, config);
     writeElectronCutNote(out, config);
     writeScorer(out, config);
 }

@@ -19,10 +19,17 @@ enum class AmfStepCalculatorMode {
     PreStep
 };
 
+enum class AmfDetectorType {
+    Water,
+    Silicon,
+    TEGas
+};
+
 struct AmfConfig {
     AmfQuantity quantity{AmfQuantity::YD};
     AmfStoppingPowerMode stoppingPowerMode{AmfStoppingPowerMode::Topas};
     AmfStepCalculatorMode stepCalculatorMode{AmfStepCalculatorMode::MidStep};
+    AmfDetectorType detectorType{AmfDetectorType::Water};
 
     std::filesystem::path topasExecutable{"topas"};
     std::filesystem::path phaseSpaceBasePath;
@@ -35,9 +42,10 @@ struct AmfConfig {
     std::string outputFile{"amf_output"};
 
     double worldHalfLengthCm{20.0};
-    double scoringHalfLengthXmm{0.5};
-    double scoringHalfLengthYmm{0.5};
+    double scoringHalfLengthXmm{50.0};
+    double scoringHalfLengthYmm{50.0};
     double scoringHalfLengthZmm{0.5};
+    double scoringRadiusMm{6.35};
     double scoringTransXmm{0.0};
     double scoringTransYmm{0.0};
     double scoringTransZmm{0.0};
@@ -82,4 +90,44 @@ inline const char* toTopasStepCalculatorModeName(AmfStepCalculatorMode mode) {
     }
 
     return "MidStep";
+}
+
+inline const char* toAmfDetectorTypeName(AmfDetectorType detectorType) {
+    switch (detectorType) {
+        case AmfDetectorType::Water:
+            return "water";
+        case AmfDetectorType::Silicon:
+            return "silicon";
+        case AmfDetectorType::TEGas:
+            return "TEgas";
+    }
+
+    return "water";
+}
+
+inline void applyAmfDetectorPreset(AmfConfig& config,
+                                   AmfDetectorType detectorType) {
+    config.detectorType = detectorType;
+
+    switch (detectorType) {
+        case AmfDetectorType::Water:
+            config.scoringComponent = "AMFScoringVolume";
+            config.scoringMaterial = "G4_WATER";
+            config.scoringHalfLengthXmm = 50.0;
+            config.scoringHalfLengthYmm = 50.0;
+            config.scoringHalfLengthZmm = 0.5;
+            break;
+        case AmfDetectorType::Silicon:
+            config.scoringComponent = "SOISensitiveLayer";
+            config.scoringMaterial = "G4_Si";
+            config.scoringHalfLengthXmm = 1.465;
+            config.scoringHalfLengthYmm = 1.790;
+            config.scoringHalfLengthZmm = 0.005;
+            break;
+        case AmfDetectorType::TEGas:
+            config.scoringComponent = "TEgasSV";
+            config.scoringMaterial = "PropaneGas";
+            config.scoringRadiusMm = 6.35;
+            break;
+    }
 }

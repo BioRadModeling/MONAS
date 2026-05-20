@@ -94,6 +94,26 @@ AmfStepCalculatorMode parseAmfStepCalculatorMode(const std::string& modeName) {
         "'. Expected MidStep or PreStep.");
 }
 
+AmfDetectorType parseAmfDetectorType(const std::string& detectorName) {
+    const std::string lower = toLower(detectorName);
+
+    if (lower == "water" || lower == "g4_water") {
+        return AmfDetectorType::Water;
+    }
+    if (lower == "silicon" || lower == "si" || lower == "soi" ||
+        lower == "g4_si") {
+        return AmfDetectorType::Silicon;
+    }
+    if (lower == "tegas" || lower == "te_gas" || lower == "te-gas" ||
+        lower == "propane" || lower == "propanegas") {
+        return AmfDetectorType::TEGas;
+    }
+
+    throw std::runtime_error(
+        "Unknown AMF detector '" + detectorName +
+        "'. Expected water, silicon, or TEgas.");
+}
+
 std::string resolveFolderName(const std::string& voxelSize,
                               const std::string& energyGrid) {
     if (voxelSize == "1mm" && energyGrid == "linear") {
@@ -155,7 +175,12 @@ void parseOptionalAmfStageArgs(int argc,
     for (int i = startIndex; i < argc; ++i) {
         const std::string arg = argv[i];
 
-        if (arg == "--domain-radius") {
+        if (arg == "--detector") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --detector");
+            }
+            applyAmfDetectorPreset(config, parseAmfDetectorType(argv[++i]));
+        } else if (arg == "--domain-radius") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("Missing value after --domain-radius");
             }
@@ -204,6 +229,11 @@ void parseOptionalAmfStageArgs(int argc,
                 throw std::runtime_error("Missing value after --scoring-half-length-z-mm");
             }
             config.scoringHalfLengthZmm = std::stod(argv[++i]);
+        } else if (arg == "--scoring-radius-mm") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value after --scoring-radius-mm");
+            }
+            config.scoringRadiusMm = std::stod(argv[++i]);
         } else if (arg == "--scoring-x-mm") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("Missing value after --scoring-x-mm");
@@ -331,11 +361,13 @@ void printUsage(const char* programName) {
         << " AMF-stage <lookupRoot> <phaseSpaceBase> <stagedRunDir> "
         << "<AMFSpectra|AMF_yD|AMF_yS>"
         << " [--domain-radius um] [--nucleus-radius um] [--beta-ref value]"
+        << " [--detector water|silicon|TEgas]"
         << " [--scoring-component name] [--scoring-material material]"
         << " [--scoring-half-length-mm mm]"
         << " [--scoring-half-length-x-mm mm]"
         << " [--scoring-half-length-y-mm mm]"
         << " [--scoring-half-length-z-mm mm]"
+        << " [--scoring-radius-mm mm]"
         << " [--scoring-x-mm mm] [--scoring-y-mm mm] [--scoring-z-mm mm]"
         << " [--world-half-length-cm cm] [--electron-cut-m m]"
         << " [--stopping-power Topas|ExternalTable]"

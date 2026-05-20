@@ -69,12 +69,14 @@ void writeManifest(const AmfConfig& config,
     out << "phase_space_header = " << stagedRun.stagedHeaderPath << "\n";
     out << "quantity = " << toTopasQuantityName(config.quantity) << "\n";
     out << "output_file = " << config.outputFile << "\n";
+    out << "detector = " << toAmfDetectorTypeName(config.detectorType) << "\n";
     out << "scoring_component = " << config.scoringComponent << "\n";
     out << "scoring_material = " << config.scoringMaterial << "\n";
     out << "world_half_length_cm = " << config.worldHalfLengthCm << "\n";
     out << "scoring_half_length_x_mm = " << config.scoringHalfLengthXmm << "\n";
     out << "scoring_half_length_y_mm = " << config.scoringHalfLengthYmm << "\n";
     out << "scoring_half_length_z_mm = " << config.scoringHalfLengthZmm << "\n";
+    out << "scoring_radius_mm = " << config.scoringRadiusMm << "\n";
     out << "scoring_trans_x_mm = " << config.scoringTransXmm << "\n";
     out << "scoring_trans_y_mm = " << config.scoringTransYmm << "\n";
     out << "scoring_trans_z_mm = " << config.scoringTransZmm << "\n";

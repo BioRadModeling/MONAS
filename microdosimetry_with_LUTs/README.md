@@ -455,7 +455,7 @@ z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy
 
 ---
 
-## AMF TOPAS replay calculations
+## AMF TOPAS calculations
 
 The `AMF-stage` and `AMF-run` modes prepare and run the TOPAS Analytical
 Microdosimetric Function extension from a TOPAS phase-space pair.
@@ -464,7 +464,15 @@ Unlike the LUT-only modes, AMF is not calculated directly inside this executable
 This project stages a reproducible TOPAS replay folder, copies the required
 `tsed.dat` file, writes a TOPAS parameter file, and optionally launches TOPAS.
 
-AMF requires both files in the phase-space pair:
+There are two valid AMF workflows:
+
+- **Phase-space replay:** use `AMF-stage` or `AMF-run` to replay an existing
+  `.phsp/.header` pair through a small detector geometry.
+- **Full simulation:** add the same AMF scorer settings directly to the original
+  TOPAS simulation input and run TOPAS normally. This is the right mode when you
+  want AMF scored during transport rather than from a saved phase space.
+
+For phase-space replay, AMF requires both files in the phase-space pair:
 
 ```text
 input/PhaseSpace_curved_33mm.phsp
@@ -496,7 +504,8 @@ From `microdosimetry_with_LUTs`:
   lookup_tables \
   input/PhaseSpace_curved_33mm \
   amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD \
-  AMF_yD
+  AMF_yD \
+  --detector water
 ```
 
 This creates:
@@ -519,7 +528,8 @@ Use a TOPAS executable that has the AMF extension compiled in:
   lookup_tables \
   input/PhaseSpace_curved_33mm \
   amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD \
-  AMF_yD
+  AMF_yD \
+  --detector water
 ```
 
 Supported AMF quantities are:
@@ -527,6 +537,17 @@ Supported AMF quantities are:
 - `AMFSpectra`: full microdosimetric spectra per scoring voxel
 - `AMF_yD`: dose-weighted mean lineal energy per scoring voxel
 - `AMF_yS`: saturation-corrected dose mean lineal energy per scoring voxel
+
+Supported detector presets for staged phase-space replay are:
+
+- `--detector water`: `10 cm x 10 cm x 1 mm` `G4_WATER` slab.
+- `--detector silicon`: SOI active-layer approximation, `2.93 mm x 3.58 mm x 10 um` `G4_Si` slab.
+- `--detector TEgas`: `6.35 mm` radius propane-gas sphere.
+
+Use `--scoring-x-mm`, `--scoring-y-mm`, and `--scoring-z-mm` to place the
+detector at the phase-space plane. The size can still be adjusted with the
+`--scoring-half-length-*` options for slab detectors, or `--scoring-radius-mm`
+for the TE-gas sphere.
 
 The generated TOPAS parameter file uses accuracy-first defaults:
 
@@ -546,6 +567,13 @@ d:Sc/AMF/BetaRef = 0.0615 /Gy2
 
 After TOPAS exits, `AMF-run` reports whether the expected AMF output files were
 found. See `amf_runtime/README.md` for the full AMF runbook and option list.
+
+For a **full simulation**, do not use the phase-space source block. Instead,
+define the desired detector component in the full TOPAS input file, attach the
+AMF scorer to that component, and keep the same physics/scorer defaults shown
+above. The generated `replay_amf.txt` file is useful as a compact reference for
+the detector and scorer block, but the source and upstream geometry should come
+from the full simulation input.
 
 For repeated depth files, use the batch helper:
 
