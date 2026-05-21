@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 
 from app.state import AppState
+from app.services.command_builder import amf_output_stem
 
 
 @dataclass
@@ -83,12 +84,18 @@ class ResultsLoader:
         state: AppState,
     ) -> None:
         if state.amf_run_mode == "replay":
-            output_stem = f"{state.amf_phase_space_base.name}_{state.amf_quantity}"
+            output_stem = amf_output_stem(state)
+            allow_name_fallback = False
         else:
             output_stem = state.amf_full_simulation_file.stem
+            allow_name_fallback = True
 
         if state.amf_quantity == "AMFSpectra":
-            spectrum_path = self._resolve_amf_spectrum_file(output_dir, output_stem)
+            spectrum_path = self._resolve_amf_spectrum_file(
+                output_dir,
+                output_stem,
+                allow_name_fallback,
+            )
             loaded.spectrum_file = spectrum_path if spectrum_path.exists() else None
             loaded.spectrum_summary_text, loaded.spectrum_points = self._load_amf_spectrum(spectrum_path)
             loaded.preferred_file = spectrum_path if spectrum_path.exists() else None
@@ -100,7 +107,12 @@ class ResultsLoader:
             ]
             return
 
-        scalar_path = self._resolve_amf_scalar_file(output_dir, output_stem, state.amf_quantity)
+        scalar_path = self._resolve_amf_scalar_file(
+            output_dir,
+            output_stem,
+            state.amf_quantity,
+            allow_name_fallback,
+        )
         value = self._load_amf_scalar(scalar_path)
         loaded.preferred_file = scalar_path if scalar_path.exists() else None
         loaded.amf_pairs = [
@@ -118,9 +130,14 @@ class ResultsLoader:
             return state.amf_staged_run_dir
         return state.amf_full_simulation_file.parent
 
-    def _resolve_amf_spectrum_file(self, output_dir: Path, output_stem: str) -> Path:
+    def _resolve_amf_spectrum_file(
+        self,
+        output_dir: Path,
+        output_stem: str,
+        allow_name_fallback: bool,
+    ) -> Path:
         exact = output_dir / f"{output_stem}_MicrodosimetricSpectra.csv"
-        if exact.exists():
+        if exact.exists() or not allow_name_fallback:
             return exact
 
         named = output_dir / "AMF_Spectra_MicrodosimetricSpectra.csv"
@@ -137,9 +154,10 @@ class ResultsLoader:
         output_dir: Path,
         output_stem: str,
         quantity: str,
+        allow_name_fallback: bool,
     ) -> Path:
         exact = output_dir / f"{output_stem}.csv"
-        if exact.exists():
+        if exact.exists() or not allow_name_fallback:
             return exact
 
         named = output_dir / f"{quantity}.csv"

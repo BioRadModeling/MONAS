@@ -150,6 +150,9 @@ class InputChecker:
                 species_text = self._format_species_text(scan)
                 if scan.charged_rows == 0:
                     warnings.append("No charged rows were found in the selected AMF phase-space file.")
+            detector_warning = self._detector_phase_space_warning(state)
+            if detector_warning:
+                warnings.append(detector_warning)
             if state.amf_disable_phase_space_precheck:
                 warnings.append("TOPAS phase-space precheck will be disabled for replay.")
         else:
@@ -368,6 +371,24 @@ class InputChecker:
         if path.is_absolute() or path.parent != Path("."):
             return path.exists()
         return shutil.which(str(path)) is not None
+
+    @staticmethod
+    def _detector_phase_space_warning(state: AppState) -> str:
+        token = state.amf_phase_space_base.name.lower()
+        if state.amf_detector == "silicon" and not any(
+            marker in token for marker in ("soi", "silicon", "si")
+        ):
+            return (
+                "Silicon replay is using a phase-space base whose name does not look like an SOI/silicon phase space. "
+                "The manual SOI comparison uses PhaseSpace_seed1_100k_soi; replaying a different phase space through the silicon detector can change the high-y tail."
+            )
+        if state.amf_detector == "TEgas" and not any(
+            marker in token for marker in ("tegas", "te_gas", "tepc", "gas")
+        ):
+            return (
+                "TEgas replay is using a phase-space base whose name does not look like a TE gas or TEPC phase space."
+            )
+        return ""
 
 
 def decode_particle_identity(pdg_code: int) -> ParticleIdentity:

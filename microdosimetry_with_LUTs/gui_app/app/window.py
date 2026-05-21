@@ -149,6 +149,19 @@ class MainWindow(QMainWindow):
         )
 
     def _run_analysis(self) -> None:
+        input_result = self.input_checker.run(self.state)
+        self.setup_panel.set_input_check_result(input_result)
+        if input_result.status == "error":
+            self._run_status = "Run blocked by input-check errors."
+            self._sync_overview(self.state)
+            QMessageBox.critical(
+                self,
+                "Input check failed",
+                "Fix the input-check errors before starting the run.\n\n"
+                + input_result.warnings_text,
+            )
+            return
+
         commands = build_command_specs(self.state)
         if not commands:
             QMessageBox.information(

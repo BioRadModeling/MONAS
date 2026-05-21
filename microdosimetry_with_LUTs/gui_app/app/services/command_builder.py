@@ -172,6 +172,8 @@ def _build_amf_command_specs(state: AppState) -> list[CommandSpec]:
         f"{state.amf_scoring_y_mm:g}",
         "--scoring-z-mm",
         f"{state.amf_scoring_z_mm:g}",
+        "--output-file",
+        amf_output_stem(state),
     ]
     if state.amf_disable_phase_space_precheck:
         amf_args.append("--no-phase-space-precheck")
@@ -217,6 +219,10 @@ def render_command_preview(state: AppState) -> str:
     return "\n".join(command.render() for command in commands)
 
 
+def amf_output_stem(state: AppState) -> str:
+    return f"{state.amf_phase_space_base.name}_{state.amf_detector}_{state.amf_quantity}"
+
+
 def planned_output_files(state: AppState) -> list[Path]:
     if state.approach == "amf":
         return _planned_amf_output_files(state)
@@ -252,7 +258,7 @@ def _planned_amf_output_files(state: AppState) -> list[Path]:
         ] if state.amf_stopping_power == "ExternalTable" else [run_dir / "tsed.dat"]
 
     run_dir = state.amf_staged_run_dir
-    output_stem = f"{state.amf_phase_space_base.name}_{state.amf_quantity}"
+    output_stem = amf_output_stem(state)
     files = [
         run_dir / "amf_run_manifest.txt",
         run_dir / "replay_amf.txt",
