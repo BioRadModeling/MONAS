@@ -67,19 +67,40 @@ void writeManifest(const AmfConfig& config,
     out << "tsed_dat = " << stagedRun.stagedTsedPath << "\n";
     out << "phase_space = " << stagedRun.stagedPhaseSpacePath << "\n";
     out << "phase_space_header = " << stagedRun.stagedHeaderPath << "\n";
+    out << "source_topas_file = " << config.sourceTopasPath << "\n";
+    out << "phase_space_scorer = " << config.phaseSpaceScorerName << "\n";
+    out << "phase_space_component = " << config.phaseSpaceComponent << "\n";
+    out << "phase_space_surface = " << config.phaseSpaceSurface << "\n";
     out << "quantity = " << toTopasQuantityName(config.quantity) << "\n";
     out << "output_file = " << config.outputFile << "\n";
-    out << "detector = " << toAmfDetectorTypeName(config.detectorType) << "\n";
+    out << "detector = water_sphere\n";
     out << "scoring_component = " << config.scoringComponent << "\n";
     out << "scoring_material = " << config.scoringMaterial << "\n";
-    out << "world_half_length_cm = " << config.worldHalfLengthCm << "\n";
-    out << "scoring_half_length_x_mm = " << config.scoringHalfLengthXmm << "\n";
-    out << "scoring_half_length_y_mm = " << config.scoringHalfLengthYmm << "\n";
-    out << "scoring_half_length_z_mm = " << config.scoringHalfLengthZmm << "\n";
+    out << "world_material = " << config.worldMaterial << "\n";
+    out << "world_half_length_x_mm = " << config.worldHalfLengthXmm << "\n";
+    out << "world_half_length_y_mm = " << config.worldHalfLengthYmm << "\n";
+    out << "world_half_length_z_mm = " << config.worldHalfLengthZmm << "\n";
     out << "scoring_radius_mm = " << config.scoringRadiusMm << "\n";
     out << "scoring_trans_x_mm = " << config.scoringTransXmm << "\n";
     out << "scoring_trans_y_mm = " << config.scoringTransYmm << "\n";
     out << "scoring_trans_z_mm = " << config.scoringTransZmm << "\n";
+    out << "phantom_component = " << config.phantomComponent << "\n";
+    out << "phantom_material = " << config.phantomMaterial << "\n";
+    out << "phantom_half_length_x_mm = " << config.phantomHalfLengthXmm << "\n";
+    out << "phantom_half_length_y_mm = " << config.phantomHalfLengthYmm << "\n";
+    out << "phantom_half_length_z_mm = " << config.phantomHalfLengthZmm << "\n";
+    out << "phantom_trans_x_mm = " << config.phantomTransXmm << "\n";
+    out << "phantom_trans_y_mm = " << config.phantomTransYmm << "\n";
+    out << "phantom_trans_z_mm = " << config.phantomTransZmm << "\n";
+    if (config.hasPhaseSpaceBounds) {
+        out << "phase_space_min_x_mm = " << config.phaseSpaceMinXmm << "\n";
+        out << "phase_space_max_x_mm = " << config.phaseSpaceMaxXmm << "\n";
+        out << "phase_space_min_y_mm = " << config.phaseSpaceMinYmm << "\n";
+        out << "phase_space_max_y_mm = " << config.phaseSpaceMaxYmm << "\n";
+        out << "phase_space_min_z_mm = " << config.phaseSpaceMinZmm << "\n";
+        out << "phase_space_max_z_mm = " << config.phaseSpaceMaxZmm << "\n";
+    }
+    out << "geometry_match_status = validated\n";
     out << "domain_radius_um = " << config.domainRadiusUm << "\n";
     out << "nucleus_radius_um = " << config.nucleusRadiusUm << "\n";
     out << "beta_ref_per_gy2 = " << config.betaRefPerGy2 << "\n";
@@ -132,6 +153,12 @@ void validateConfig(const AmfConfig& config) {
     if (!isValidAmfDomainRadiusUm(config.domainRadiusUm)) {
         throw std::runtime_error(
             "AMF domain radius must be between 0.0015 um and 0.5 um.");
+    }
+    if (config.scoringRadiusMm <= 0.0) {
+        throw std::runtime_error("AMF scoring radius must be greater than zero.");
+    }
+    if (config.sourceTopasPath.empty()) {
+        throw std::runtime_error("AMF source TOPAS input file is required.");
     }
 }
 

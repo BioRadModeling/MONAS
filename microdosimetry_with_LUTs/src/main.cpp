@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "AmfGeometryDeriver.h"
 #include "AmfResultParser.h"
 #include "AmfRunner.h"
 #include "CsvWriter.h"
@@ -94,26 +95,6 @@ AmfStepCalculatorMode parseAmfStepCalculatorMode(const std::string& modeName) {
         "'. Expected MidStep or PreStep.");
 }
 
-AmfDetectorType parseAmfDetectorType(const std::string& detectorName) {
-    const std::string lower = toLower(detectorName);
-
-    if (lower == "water" || lower == "g4_water") {
-        return AmfDetectorType::Water;
-    }
-    if (lower == "silicon" || lower == "si" || lower == "soi" ||
-        lower == "g4_si") {
-        return AmfDetectorType::Silicon;
-    }
-    if (lower == "tegas" || lower == "te_gas" || lower == "te-gas" ||
-        lower == "propane" || lower == "propanegas") {
-        return AmfDetectorType::TEGas;
-    }
-
-    throw std::runtime_error(
-        "Unknown AMF detector '" + detectorName +
-        "'. Expected water, silicon, or TEgas.");
-}
-
 std::string resolveFolderName(const std::string& voxelSize,
                               const std::string& energyGrid) {
     if (voxelSize == "1mm" && energyGrid == "linear") {
@@ -168,19 +149,15 @@ fs::path resolveLibraryDir(const fs::path& lookupRoot,
     return lookupRoot / lutName / resolveFolderName(voxelSize, energyGrid);
 }
 
-void parseOptionalAmfStageArgs(int argc,
+bool parseOptionalAmfStageArgs(int argc,
                                char* argv[],
                                int startIndex,
                                AmfConfig& config) {
+    bool sawScoringRadius = false;
     for (int i = startIndex; i < argc; ++i) {
         const std::string arg = argv[i];
 
-        if (arg == "--detector") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --detector");
-            }
-            applyAmfDetectorPreset(config, parseAmfDetectorType(argv[++i]));
-        } else if (arg == "--domain-radius") {
+        if (arg == "--domain-radius") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("Missing value after --domain-radius");
             }
@@ -199,65 +176,12 @@ void parseOptionalAmfStageArgs(int argc,
                 throw std::runtime_error("Missing value after --beta-ref");
             }
             config.betaRefPerGy2 = std::stod(argv[++i]);
-        } else if (arg == "--scoring-component") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-component");
-            }
-            config.scoringComponent = argv[++i];
-        } else if (arg == "--scoring-material") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-material");
-            }
-            config.scoringMaterial = argv[++i];
-        } else if (arg == "--scoring-half-length" ||
-                   arg == "--scoring-half-length-mm") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-half-length");
-            }
-            const double halfLengthMm = std::stod(argv[++i]);
-            config.scoringHalfLengthXmm = halfLengthMm;
-            config.scoringHalfLengthYmm = halfLengthMm;
-            config.scoringHalfLengthZmm = halfLengthMm;
-        } else if (arg == "--scoring-half-length-x-mm") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-half-length-x-mm");
-            }
-            config.scoringHalfLengthXmm = std::stod(argv[++i]);
-        } else if (arg == "--scoring-half-length-y-mm") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-half-length-y-mm");
-            }
-            config.scoringHalfLengthYmm = std::stod(argv[++i]);
-        } else if (arg == "--scoring-half-length-z-mm") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-half-length-z-mm");
-            }
-            config.scoringHalfLengthZmm = std::stod(argv[++i]);
         } else if (arg == "--scoring-radius-mm") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("Missing value after --scoring-radius-mm");
             }
             config.scoringRadiusMm = std::stod(argv[++i]);
-        } else if (arg == "--scoring-x-mm") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-x-mm");
-            }
-            config.scoringTransXmm = std::stod(argv[++i]);
-        } else if (arg == "--scoring-y-mm") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-y-mm");
-            }
-            config.scoringTransYmm = std::stod(argv[++i]);
-        } else if (arg == "--scoring-z-mm") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --scoring-z-mm");
-            }
-            config.scoringTransZmm = std::stod(argv[++i]);
-        } else if (arg == "--world-half-length-cm") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value after --world-half-length-cm");
-            }
-            config.worldHalfLengthCm = std::stod(argv[++i]);
+            sawScoringRadius = true;
         } else if (arg == "--electron-cut" || arg == "--electron-cut-m") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("Missing value after --electron-cut");
@@ -286,6 +210,7 @@ void parseOptionalAmfStageArgs(int argc,
             throw std::runtime_error("Unknown AMF option: " + arg);
         }
     }
+    return sawScoringRadius;
 }
 
 void parseOptionalBuildArgs(int argc,
@@ -362,25 +287,18 @@ void printUsage(const char* programName) {
         << "\n"
         << "  AMF staging:\n"
         << "    " << programName
-        << " AMF-stage <lookupRoot> <phaseSpaceBase> <stagedRunDir> "
+        << " AMF-stage <lookupRoot> <phaseSpaceBase> <sourceTopasTxt> <stagedRunDir> "
         << "<AMFSpectra|AMF_yD|AMF_yS>"
         << " [--domain-radius um(0.0015-0.5)]"
         << " [--nucleus-radius um] [--beta-ref value]"
-        << " [--detector water|silicon|TEgas]"
-        << " [--scoring-component name] [--scoring-material material]"
-        << " [--scoring-half-length-mm mm]"
-        << " [--scoring-half-length-x-mm mm]"
-        << " [--scoring-half-length-y-mm mm]"
-        << " [--scoring-half-length-z-mm mm]"
-        << " [--scoring-radius-mm mm]"
-        << " [--scoring-x-mm mm] [--scoring-y-mm mm] [--scoring-z-mm mm]"
-        << " [--world-half-length-cm cm] [--electron-cut-m m]"
+        << " --scoring-radius-mm mm"
+        << " [--electron-cut-m m]"
         << " [--stopping-power Topas|ExternalTable]"
         << " [--step-calculator MidStep|PreStep]"
         << " [--phase-space-precheck|--no-phase-space-precheck]"
         << " [--output-file name]\n"
         << "    " << programName
-        << " AMF-run <topasExecutable> <lookupRoot> <phaseSpaceBase> "
+        << " AMF-run <topasExecutable> <lookupRoot> <phaseSpaceBase> <sourceTopasTxt> "
         << "<stagedRunDir> <AMFSpectra|AMF_yD|AMF_yS> [same options]\n";
 }
 
@@ -396,23 +314,31 @@ int main(int argc, char* argv[]) {
         const std::string mode = argv[1];
 
         if (mode == "AMF-stage") {
-            if (argc < 6) {
+            if (argc < 7) {
                 throw std::runtime_error(
                     "AMF-stage requires: <lookupRoot> <phaseSpaceBase> "
-                    "<stagedRunDir> <AMFSpectra|AMF_yD|AMF_yS>");
+                    "<sourceTopasTxt> <stagedRunDir> "
+                    "<AMFSpectra|AMF_yD|AMF_yS>");
             }
 
             AmfConfig config;
             const fs::path lookupRoot = argv[2];
             config.tsedPath = lookupRoot / "AMF" / "tsed.dat";
             config.phaseSpaceBasePath = argv[3];
-            config.stagedRunDir = argv[4];
-            config.quantity = parseAmfQuantity(argv[5]);
+            config.sourceTopasPath = argv[4];
+            config.stagedRunDir = argv[5];
+            config.quantity = parseAmfQuantity(argv[6]);
             config.outputFile =
                 config.phaseSpaceBasePath.filename().string() + "_" +
                 toTopasQuantityName(config.quantity);
 
-            parseOptionalAmfStageArgs(argc, argv, 6, config);
+            const bool sawScoringRadius =
+                parseOptionalAmfStageArgs(argc, argv, 7, config);
+            if (!sawScoringRadius) {
+                throw std::runtime_error(
+                    "AMF-stage requires --scoring-radius-mm.");
+            }
+            AmfGeometryDeriver::deriveReplayGeometry(config);
 
             const AmfStagedRun stagedRun = AmfRunner::stageRun(config);
 
@@ -428,10 +354,10 @@ int main(int argc, char* argv[]) {
         }
 
         if (mode == "AMF-run") {
-            if (argc < 7) {
+            if (argc < 8) {
                 throw std::runtime_error(
                     "AMF-run requires: <topasExecutable> <lookupRoot> "
-                    "<phaseSpaceBase> <stagedRunDir> "
+                    "<phaseSpaceBase> <sourceTopasTxt> <stagedRunDir> "
                     "<AMFSpectra|AMF_yD|AMF_yS>");
             }
 
@@ -440,13 +366,20 @@ int main(int argc, char* argv[]) {
             const fs::path lookupRoot = argv[3];
             config.tsedPath = lookupRoot / "AMF" / "tsed.dat";
             config.phaseSpaceBasePath = argv[4];
-            config.stagedRunDir = argv[5];
-            config.quantity = parseAmfQuantity(argv[6]);
+            config.sourceTopasPath = argv[5];
+            config.stagedRunDir = argv[6];
+            config.quantity = parseAmfQuantity(argv[7]);
             config.outputFile =
                 config.phaseSpaceBasePath.filename().string() + "_" +
                 toTopasQuantityName(config.quantity);
 
-            parseOptionalAmfStageArgs(argc, argv, 7, config);
+            const bool sawScoringRadius =
+                parseOptionalAmfStageArgs(argc, argv, 8, config);
+            if (!sawScoringRadius) {
+                throw std::runtime_error(
+                    "AMF-run requires --scoring-radius-mm.");
+            }
+            AmfGeometryDeriver::deriveReplayGeometry(config);
 
             const AmfRunResult result = AmfRunner::runTopas(config);
 

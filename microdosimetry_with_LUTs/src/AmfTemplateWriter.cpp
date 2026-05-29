@@ -14,6 +14,18 @@ std::string phaseSpaceBasename(const std::filesystem::path& phaseSpaceBasePath) 
     return phaseSpaceBasePath.filename().string();
 }
 
+double localScoringXmm(const AmfConfig& config) {
+    return config.scoringTransXmm - config.phantomTransXmm;
+}
+
+double localScoringYmm(const AmfConfig& config) {
+    return config.scoringTransYmm - config.phantomTransYmm;
+}
+
+double localScoringZmm(const AmfConfig& config) {
+    return config.scoringTransZmm - config.phantomTransZmm;
+}
+
 void writeCommonSource(std::ostream& out, const AmfConfig& config) {
     out << "# Phase-space source\n";
     out << "s:So/Replay/Type = \"PhaseSpace\"\n";
@@ -24,44 +36,44 @@ void writeCommonSource(std::ostream& out, const AmfConfig& config) {
         << boolToTopas(config.phaseSpacePreCheck) << "\"\n\n";
 }
 
-void writeBoxDetector(std::ostream& out, const AmfConfig& config) {
-    out << "s:Ge/" << config.scoringComponent << "/Parent = \"World\"\n";
-    out << "s:Ge/" << config.scoringComponent << "/Type = \"TsBox\"\n";
-    out << "s:Ge/" << config.scoringComponent << "/Material = \""
-        << config.scoringMaterial << "\"\n";
-    out << "d:Ge/" << config.scoringComponent << "/HLX = "
-        << config.scoringHalfLengthXmm << " mm\n";
-    out << "d:Ge/" << config.scoringComponent << "/HLY = "
-        << config.scoringHalfLengthYmm << " mm\n";
-    out << "d:Ge/" << config.scoringComponent << "/HLZ = "
-        << config.scoringHalfLengthZmm << " mm\n";
-    out << "d:Ge/" << config.scoringComponent << "/TransX = "
-        << config.scoringTransXmm << " mm\n";
-    out << "d:Ge/" << config.scoringComponent << "/TransY = "
-        << config.scoringTransYmm << " mm\n";
-    out << "d:Ge/" << config.scoringComponent << "/TransZ = "
-        << config.scoringTransZmm << " mm\n";
-    out << "d:Ge/" << config.scoringComponent << "/RotX = 0.0 deg\n";
-    out << "d:Ge/" << config.scoringComponent << "/RotY = 0.0 deg\n";
-    out << "d:Ge/" << config.scoringComponent << "/RotZ = 0.0 deg\n\n";
-}
+void writeGeometry(std::ostream& out, const AmfConfig& config) {
+    out << "# Geometry derived from source TOPAS input\n";
+    out << "# Source file: " << config.sourceTopasPath << "\n";
+    out << "# Phase-space scorer: Sc/" << config.phaseSpaceScorerName << "\n";
+    out << "# Phase-space component: " << config.phaseSpaceComponent << "\n";
+    out << "# Phase-space surface: " << config.phaseSpaceSurface << "\n";
+    out << "d:Ge/World/HLX = " << config.worldHalfLengthXmm << " mm\n";
+    out << "d:Ge/World/HLY = " << config.worldHalfLengthYmm << " mm\n";
+    out << "d:Ge/World/HLZ = " << config.worldHalfLengthZmm << " mm\n";
+    out << "s:Ge/World/Material = \"" << config.worldMaterial << "\"\n\n";
 
-void writeTEGasMaterial(std::ostream& out, const AmfConfig& config) {
-    if (config.scoringMaterial != "PropaneGas") {
-        return;
-    }
+    out << "# Water phantom copied from the source simulation placement\n";
+    out << "s:Ge/" << config.phantomComponent << "/Parent = \"World\"\n";
+    out << "s:Ge/" << config.phantomComponent << "/Type = \"TsBox\"\n";
+    out << "s:Ge/" << config.phantomComponent << "/Material = \""
+        << config.phantomMaterial << "\"\n";
+    out << "d:Ge/" << config.phantomComponent << "/HLX = "
+        << config.phantomHalfLengthXmm << " mm\n";
+    out << "d:Ge/" << config.phantomComponent << "/HLY = "
+        << config.phantomHalfLengthYmm << " mm\n";
+    out << "d:Ge/" << config.phantomComponent << "/HLZ = "
+        << config.phantomHalfLengthZmm << " mm\n";
+    out << "d:Ge/" << config.phantomComponent << "/TransX = "
+        << config.phantomTransXmm << " mm\n";
+    out << "d:Ge/" << config.phantomComponent << "/TransY = "
+        << config.phantomTransYmm << " mm\n";
+    out << "d:Ge/" << config.phantomComponent << "/TransZ = "
+        << config.phantomTransZmm << " mm\n";
+    out << "d:Ge/" << config.phantomComponent << "/RotX = 0.0 deg\n";
+    out << "d:Ge/" << config.phantomComponent << "/RotY = 0.0 deg\n";
+    out << "d:Ge/" << config.phantomComponent << "/RotZ = 0.0 deg\n\n";
 
-    out << "# Tissue-equivalent propane gas\n";
-    out << "sv:Ma/PropaneGas/Components = 2 \"Hydrogen\" \"Carbon\"\n";
-    out << "uv:Ma/PropaneGas/Fractions = 2 0.182864 0.817136\n";
-    out << "d:Ma/PropaneGas/Density = 0.108 mg/cm3\n\n";
-}
-
-void writeSphereDetector(std::ostream& out, const AmfConfig& config) {
-    out << "s:Ge/" << config.scoringComponent << "/Parent = \"World\"\n";
+    out << "# AMF detector is always water and is centered on the source "
+           "phase-space scoring region\n";
+    out << "s:Ge/" << config.scoringComponent << "/Parent = \""
+        << config.phantomComponent << "\"\n";
     out << "s:Ge/" << config.scoringComponent << "/Type = \"TsSphere\"\n";
-    out << "s:Ge/" << config.scoringComponent << "/Material = \""
-        << config.scoringMaterial << "\"\n";
+    out << "s:Ge/" << config.scoringComponent << "/Material = \"G4_WATER\"\n";
     out << "d:Ge/" << config.scoringComponent << "/RMin = 0 mm\n";
     out << "d:Ge/" << config.scoringComponent << "/RMax = "
         << config.scoringRadiusMm << " mm\n";
@@ -70,50 +82,14 @@ void writeSphereDetector(std::ostream& out, const AmfConfig& config) {
     out << "d:Ge/" << config.scoringComponent << "/STheta = 0 deg\n";
     out << "d:Ge/" << config.scoringComponent << "/DTheta = 180 deg\n";
     out << "d:Ge/" << config.scoringComponent << "/TransX = "
-        << config.scoringTransXmm << " mm\n";
+        << localScoringXmm(config) << " mm\n";
     out << "d:Ge/" << config.scoringComponent << "/TransY = "
-        << config.scoringTransYmm << " mm\n";
+        << localScoringYmm(config) << " mm\n";
     out << "d:Ge/" << config.scoringComponent << "/TransZ = "
-        << config.scoringTransZmm << " mm\n";
+        << localScoringZmm(config) << " mm\n";
     out << "d:Ge/" << config.scoringComponent << "/RotX = 0.0 deg\n";
     out << "d:Ge/" << config.scoringComponent << "/RotY = 0.0 deg\n";
     out << "d:Ge/" << config.scoringComponent << "/RotZ = 0.0 deg\n\n";
-}
-
-void writeGeometryPlaceholder(std::ostream& out, const AmfConfig& config) {
-    out << "# Geometry\n";
-    out << "# Detector preset: "
-        << toAmfDetectorTypeName(config.detectorType) << "\n";
-    out << "d:Ge/World/HLX = " << config.worldHalfLengthCm << " cm\n";
-    out << "d:Ge/World/HLY = " << config.worldHalfLengthCm << " cm\n";
-    out << "d:Ge/World/HLZ = " << config.worldHalfLengthCm << " cm\n";
-    out << "s:Ge/World/Material = \"Air\"\n\n";
-
-    if (config.detectorType == AmfDetectorType::TEGas) {
-        writeTEGasMaterial(out, config);
-        writeSphereDetector(out, config);
-    } else {
-        writeBoxDetector(out, config);
-    }
-}
-
-void writeDetectorNotes(std::ostream& out, const AmfConfig& config) {
-    out << "# Detector notes\n";
-
-    switch (config.detectorType) {
-        case AmfDetectorType::Water:
-            out << "# water: 10 cm x 10 cm x 1 mm G4_WATER slab by default.\n";
-            break;
-        case AmfDetectorType::Silicon:
-            out << "# silicon: SOI active-layer approximation, "
-                << "2.93 mm x 3.58 mm x 10 um G4_Si by default.\n";
-            break;
-        case AmfDetectorType::TEGas:
-            out << "# TEgas: 6.35 mm radius propane-gas sphere by default.\n";
-            break;
-    }
-
-    out << "\n";
 }
 
 void writeElectronCutNote(std::ostream& out, const AmfConfig& config) {
@@ -133,6 +109,7 @@ void writeScorer(std::ostream& out, const AmfConfig& config) {
         << toTopasQuantityName(config.quantity) << "\"\n";
     out << "s:Sc/" << scorerName << "/Component = \""
         << config.scoringComponent << "\"\n";
+    out << "s:Sc/" << scorerName << "/OutputType = \"csv\"\n";
     out << "s:Sc/" << scorerName << "/OutputFile = \""
         << config.outputFile << "\"\n";
     out << "s:Sc/" << scorerName
@@ -170,8 +147,7 @@ void AmfTemplateWriter::writeReplayParameterFile(
     out << "# Keep tsed.dat in the same directory where this file is launched.\n\n";
 
     writeCommonSource(out, config);
-    writeGeometryPlaceholder(out, config);
-    writeDetectorNotes(out, config);
+    writeGeometry(out, config);
     writeElectronCutNote(out, config);
     writeScorer(out, config);
 }
