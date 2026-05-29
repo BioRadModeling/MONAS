@@ -39,8 +39,8 @@ d:Ph/Default/CutForElectron = 1000 m
 # AMF scorer
 s:Sc/AMF/Quantity = "AMFSpectra"
 s:Sc/AMF/Component = "AMFScoringVolume"
-s:Sc/AMF/OutputFile = "PhaseSpace_curved_33mm_AMFSpectra"
+s:Sc/AMF/OutputFile = "PhaseSpace_curved_33mm_water_AMFSpectra"
 s:Sc/AMF/IfOutputFileAlreadyExists = "Overwrite"
-d:Sc/AMF/DomainRadius = 0.28 um
+d:Sc/AMF/DomainRadius = 0.48 um
 s:Sc/AMF/StoppingPowerCalculation = "Topas"
 s:Sc/AMF/StepCalculator = "MidStep"

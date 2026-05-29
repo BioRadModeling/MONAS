@@ -102,39 +102,10 @@ def build_command_specs(state: AppState) -> list[CommandSpec]:
 def _build_amf_command_specs(state: AppState) -> list[CommandSpec]:
     commands: list[CommandSpec] = []
 
-    if state.amf_run_mode == "full":
-        run_dir = state.amf_full_simulation_file.parent
-        _append_copy_command(
-            commands,
-            "Stage AMF tsed.dat",
-            state.lookup_root / "AMF" / "tsed.dat",
-            run_dir / "tsed.dat",
-            run_dir,
-        )
-        if state.amf_stopping_power == "ExternalTable":
-            _append_copy_command(
-                commands,
-                "Stage AMF external stopping-power table",
-                state.amf_external_stopping_power_file,
-                run_dir / "StoppingPower.txt",
-                run_dir,
-            )
-        commands.append(
-            CommandSpec(
-                label="Run AMF full simulation",
-                argv=[
-                    str(state.topas_executable_path),
-                    str(state.amf_full_simulation_file),
-                ],
-                workdir=run_dir,
-            )
-        )
-        return commands
-
     commands.append(
         CommandSpec(
-            label="Create AMF staged run directory",
-            argv=["/bin/mkdir", "-p", str(state.amf_staged_run_dir)],
+            label="Create AMF output directory",
+            argv=["/bin/mkdir", "-p", str(state.amf_output_dir)],
             workdir=state.build_workdir,
         )
     )
@@ -144,7 +115,7 @@ def _build_amf_command_specs(state: AppState) -> list[CommandSpec]:
             commands,
             "Stage AMF external stopping-power table",
             state.amf_external_stopping_power_file,
-            state.amf_staged_run_dir / "StoppingPower.txt",
+            state.amf_output_dir / "StoppingPower.txt",
             state.build_workdir,
         )
 
@@ -154,24 +125,15 @@ def _build_amf_command_specs(state: AppState) -> list[CommandSpec]:
         str(state.topas_executable_path),
         str(state.lookup_root),
         str(state.amf_phase_space_base),
-        str(state.amf_staged_run_dir),
+        str(state.amf_source_topas_file),
+        str(state.amf_output_dir),
         state.amf_quantity,
-        "--detector",
-        state.amf_detector,
+        "--scoring-radius-mm",
+        f"{state.amf_scoring_radius_mm:g}",
         "--domain-radius",
         f"{state.amf_domain_radius_um:g}",
         "--stopping-power",
         state.amf_stopping_power,
-        "--step-calculator",
-        state.amf_step_calculator,
-        "--world-half-length-cm",
-        f"{state.amf_world_half_length_cm:g}",
-        "--scoring-x-mm",
-        f"{state.amf_scoring_x_mm:g}",
-        "--scoring-y-mm",
-        f"{state.amf_scoring_y_mm:g}",
-        "--scoring-z-mm",
-        f"{state.amf_scoring_z_mm:g}",
         "--output-file",
         amf_output_stem(state),
     ]
@@ -220,7 +182,7 @@ def render_command_preview(state: AppState) -> str:
 
 
 def amf_output_stem(state: AppState) -> str:
-    return f"{state.amf_phase_space_base.name}_{state.amf_detector}_{state.amf_quantity}"
+    return f"{state.amf_phase_space_base.name}_{state.amf_quantity}"
 
 
 def planned_output_files(state: AppState) -> list[Path]:
@@ -250,14 +212,7 @@ def planned_output_files(state: AppState) -> list[Path]:
 
 
 def _planned_amf_output_files(state: AppState) -> list[Path]:
-    if state.amf_run_mode == "full":
-        run_dir = state.amf_full_simulation_file.parent
-        return [
-            run_dir / "tsed.dat",
-            run_dir / "StoppingPower.txt",
-        ] if state.amf_stopping_power == "ExternalTable" else [run_dir / "tsed.dat"]
-
-    run_dir = state.amf_staged_run_dir
+    run_dir = state.amf_output_dir
     output_stem = amf_output_stem(state)
     files = [
         run_dir / "amf_run_manifest.txt",

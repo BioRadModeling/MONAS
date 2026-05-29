@@ -83,12 +83,8 @@ class ResultsLoader:
         output_dir: Path,
         state: AppState,
     ) -> None:
-        if state.amf_run_mode == "replay":
-            output_stem = amf_output_stem(state)
-            allow_name_fallback = False
-        else:
-            output_stem = state.amf_full_simulation_file.stem
-            allow_name_fallback = True
+        output_stem = amf_output_stem(state)
+        allow_name_fallback = False
 
         if state.amf_quantity == "AMFSpectra":
             spectrum_path = self._resolve_amf_spectrum_file(
@@ -101,7 +97,6 @@ class ResultsLoader:
             loaded.preferred_file = spectrum_path if spectrum_path.exists() else None
             loaded.amf_pairs = [
                 ("Quantity", state.amf_quantity),
-                ("Detector", state.amf_detector),
                 ("Domain radius [um]", f"{state.amf_domain_radius_um:g}"),
                 ("Spectrum file", str(spectrum_path) if spectrum_path.exists() else "Not found"),
             ]
@@ -117,7 +112,6 @@ class ResultsLoader:
         loaded.preferred_file = scalar_path if scalar_path.exists() else None
         loaded.amf_pairs = [
             ("Quantity", state.amf_quantity),
-            ("Detector", state.amf_detector),
             ("Domain radius [um]", f"{state.amf_domain_radius_um:g}"),
             ("Result file", str(scalar_path) if scalar_path.exists() else "Not found"),
             ("Value", value if value is not None else "No numeric result found"),
@@ -126,9 +120,7 @@ class ResultsLoader:
     def _effective_output_dir(self, state: AppState) -> Path:
         if state.approach != "amf":
             return state.output_dir
-        if state.amf_run_mode == "replay":
-            return state.amf_staged_run_dir
-        return state.amf_full_simulation_file.parent
+        return state.amf_output_dir
 
     def _resolve_amf_spectrum_file(
         self,

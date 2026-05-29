@@ -37,6 +37,11 @@ def parse_args():
         help="Directory containing .phsp/.header phase-space pairs.",
     )
     parser.add_argument(
+        "--source-topas",
+        required=True,
+        help="Resolved TOPAS input file that generated the phase-space pairs.",
+    )
+    parser.add_argument(
         "--staged-root",
         default="amf_runtime/staged_runs",
         help="Directory where per-depth AMF run folders will be created.",
@@ -46,6 +51,12 @@ def parse_args():
         required=True,
         choices=sorted(VALID_QUANTITIES),
         help="AMF quantity to score.",
+    )
+    parser.add_argument(
+        "--scoring-radius-mm",
+        required=True,
+        type=float,
+        help="Radius of the generated water AMF scoring sphere.",
     )
     parser.add_argument(
         "--pattern",
@@ -67,40 +78,6 @@ def parse_args():
         action="store_true",
         help="Continue to later phase-space pairs if one run fails.",
     )
-    parser.add_argument(
-        "--auto-slab-geometry",
-        action="store_true",
-        help=(
-            "Derive a macroscopic slab geometry from each phase-space file: "
-            "center Z on the phase-space Z midpoint and use a 1 mm slab "
-            "thickness by default."
-        ),
-    )
-    parser.add_argument(
-        "--slab-half-x-mm",
-        type=float,
-        default=50.0,
-        help="Half-width of the auto slab in X. Default is 50 mm for a 10 cm slab.",
-    )
-    parser.add_argument(
-        "--slab-half-y-mm",
-        type=float,
-        default=50.0,
-        help="Half-width of the auto slab in Y. Default is 50 mm for a 10 cm slab.",
-    )
-    parser.add_argument(
-        "--slab-half-z-mm",
-        type=float,
-        default=0.5,
-        help="Half-thickness of the auto slab in Z. Default is 0.5 mm for a 1 mm slab.",
-    )
-    parser.add_argument(
-        "--auto-world-margin-mm",
-        type=float,
-        default=100.0,
-        help="Extra world half-length margin around the auto slab. Default is 100 mm.",
-    )
-
     args, amf_options = parser.parse_known_args()
     if amf_options and amf_options[0] == "--":
         amf_options = amf_options[1:]
@@ -133,82 +110,6 @@ def discover_phase_spaces(input_dir: Path, pattern: str):
     return pairs, missing_headers
 
 
-def phase_space_bounds_cm(phase_space_file: Path):
-    bounds = {
-        "min_x": None,
-        "max_x": None,
-        "min_y": None,
-        "max_y": None,
-        "min_z": None,
-        "max_z": None,
-    }
-    row_count = 0
-
-    with phase_space_file.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            parts = line.split()
-            if len(parts) < 3:
-                continue
-            try:
-                x_cm, y_cm, z_cm = (float(parts[0]), float(parts[1]), float(parts[2]))
-            except ValueError:
-                continue
-
-            row_count += 1
-            if bounds["min_x"] is None:
-                bounds.update(
-                    {
-                        "min_x": x_cm,
-                        "max_x": x_cm,
-                        "min_y": y_cm,
-                        "max_y": y_cm,
-                        "min_z": z_cm,
-                        "max_z": z_cm,
-                    }
-                )
-                continue
-
-            bounds["min_x"] = min(bounds["min_x"], x_cm)
-            bounds["max_x"] = max(bounds["max_x"], x_cm)
-            bounds["min_y"] = min(bounds["min_y"], y_cm)
-            bounds["max_y"] = max(bounds["max_y"], y_cm)
-            bounds["min_z"] = min(bounds["min_z"], z_cm)
-            bounds["max_z"] = max(bounds["max_z"], z_cm)
-
-    if row_count == 0:
-        raise ValueError(f"No numeric phase-space rows found: {phase_space_file}")
-
-    return bounds
-
-
-def auto_slab_options(base: Path, args):
-    bounds = phase_space_bounds_cm(base.with_suffix(".phsp"))
-    z_mid_mm = 10.0 * (bounds["min_z"] + bounds["max_z"]) / 2.0
-    world_half_length_mm = max(
-        args.slab_half_x_mm,
-        args.slab_half_y_mm,
-        abs(z_mid_mm) + args.slab_half_z_mm,
-    ) + args.auto_world_margin_mm
-    world_half_length_cm = world_half_length_mm / 10.0
-
-    return [
-        "--world-half-length-cm",
-        f"{world_half_length_cm:.6g}",
-        "--scoring-half-length-x-mm",
-        f"{args.slab_half_x_mm:.6g}",
-        "--scoring-half-length-y-mm",
-        f"{args.slab_half_y_mm:.6g}",
-        "--scoring-half-length-z-mm",
-        f"{args.slab_half_z_mm:.6g}",
-        "--scoring-x-mm",
-        "0",
-        "--scoring-y-mm",
-        "0",
-        "--scoring-z-mm",
-        f"{z_mid_mm:.6g}",
-    ]
-
-
 def run_command(command, dry_run: bool):
     print(" ".join(str(part) for part in command), flush=True)
     if dry_run:
@@ -222,10 +123,12 @@ def main():
     app = Path(args.app)
     lookup_root = Path(args.lookup_root)
     input_dir = Path(args.input_dir)
+    source_topas = Path(args.source_topas)
     staged_root = Path(args.staged_root)
 
     require_existing_file(app, "microdosimetry executable")
     require_existing_file(lookup_root / "AMF" / "tsed.dat", "AMF tsed.dat")
+    require_existing_file(source_topas, "source TOPAS input file")
 
     if not input_dir.is_dir():
         raise NotADirectoryError(f"Input directory not found: {input_dir}")
@@ -259,8 +162,11 @@ def main():
                 "AMF-stage",
                 str(lookup_root),
                 str(base),
+                str(source_topas),
                 str(staged_run_dir),
                 args.quantity,
+                "--scoring-radius-mm",
+                f"{args.scoring_radius_mm:g}",
             ]
         else:
             command = [
@@ -269,12 +175,12 @@ def main():
                 str(args.topas),
                 str(lookup_root),
                 str(base),
+                str(source_topas),
                 str(staged_run_dir),
                 args.quantity,
+                "--scoring-radius-mm",
+                f"{args.scoring_radius_mm:g}",
             ]
-
-        if args.auto_slab_geometry:
-            command.extend(auto_slab_options(base, args))
 
         command.extend(args.amf_options)
         exit_code = run_command(command, args.dry_run)

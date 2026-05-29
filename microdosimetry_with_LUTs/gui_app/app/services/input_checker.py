@@ -133,40 +133,30 @@ class InputChecker:
         scan: PhaseSpaceScan | None = None
         species_text = ""
 
-        if state.amf_run_mode == "replay":
-            phase_space_file = state.amf_phase_space_base.with_suffix(".phsp")
-            header_file = state.amf_phase_space_base.with_suffix(".header")
-            if not phase_space_file.exists():
-                errors.append(f"AMF phase-space file not found: {phase_space_file}")
-            if not header_file.exists():
-                errors.append(f"AMF phase-space header not found: {header_file}")
-            if not state.amf_staged_run_dir.parent.exists():
-                errors.append(
-                    f"AMF staged run parent directory does not exist: {state.amf_staged_run_dir.parent}"
-                )
-
-            if phase_space_file.exists():
-                scan = self._scan_phase_space(phase_space_file)
-                species_text = self._format_species_text(scan)
-                if scan.charged_rows == 0:
-                    warnings.append("No charged rows were found in the selected AMF phase-space file.")
-            detector_warning = self._detector_phase_space_warning(state)
-            if detector_warning:
-                warnings.append(detector_warning)
-            if state.amf_disable_phase_space_precheck:
-                warnings.append("TOPAS phase-space precheck will be disabled for replay.")
-        else:
-            if not state.amf_full_simulation_file.exists():
-                errors.append(
-                    f"AMF full simulation TOPAS file not found: {state.amf_full_simulation_file}"
-                )
-            if not state.amf_full_simulation_file.parent.exists():
-                errors.append(
-                    f"AMF full simulation directory does not exist: {state.amf_full_simulation_file.parent}"
-                )
-            warnings.append(
-                "Full simulation runs the selected TOPAS file directly; the file should already contain the AMF detector and scorer block."
+        phase_space_file = state.amf_phase_space_base.with_suffix(".phsp")
+        header_file = state.amf_phase_space_base.with_suffix(".header")
+        if not phase_space_file.exists():
+            errors.append(f"AMF phase-space file not found: {phase_space_file}")
+        if not header_file.exists():
+            errors.append(f"AMF phase-space header not found: {header_file}")
+        if not state.amf_source_topas_file.exists():
+            errors.append(
+                f"Source TOPAS simulation txt file not found: {state.amf_source_topas_file}"
             )
+        if not state.amf_output_dir.parent.exists():
+            errors.append(
+                f"AMF output parent directory does not exist: {state.amf_output_dir.parent}"
+            )
+
+        if phase_space_file.exists():
+            scan = self._scan_phase_space(phase_space_file)
+            species_text = self._format_species_text(scan)
+            if scan.charged_rows == 0:
+                warnings.append(
+                    "No charged rows were found in the selected AMF phase-space file."
+                )
+        if state.amf_disable_phase_space_precheck:
+            warnings.append("TOPAS phase-space precheck will be disabled for replay.")
 
         if errors:
             return InputCheckResult(
@@ -350,12 +340,12 @@ class InputChecker:
         scan: PhaseSpaceScan | None,
     ) -> str:
         lines = [
-            f"AMF mode: {'phase-space replay' if state.amf_run_mode == 'replay' else 'full simulation'}",
+            "AMF mode: phase-space replay",
             f"Quantity: {state.amf_quantity}",
-            f"Detector: {state.amf_detector}",
             f"Domain radius: {state.amf_domain_radius_um:g} um",
             f"Stopping power: {state.amf_stopping_power}",
-            f"Scoring position: ({state.amf_scoring_x_mm:g}, {state.amf_scoring_y_mm:g}, {state.amf_scoring_z_mm:g}) mm",
+            f"Source TOPAS simulation txt: {state.amf_source_topas_file}",
+            f"Output directory: {state.amf_output_dir}",
         ]
         if scan is not None:
             lines.extend(
@@ -371,25 +361,6 @@ class InputChecker:
         if path.is_absolute() or path.parent != Path("."):
             return path.exists()
         return shutil.which(str(path)) is not None
-
-    @staticmethod
-    def _detector_phase_space_warning(state: AppState) -> str:
-        token = state.amf_phase_space_base.name.lower()
-        if state.amf_detector == "silicon" and not any(
-            marker in token for marker in ("soi", "silicon", "si")
-        ):
-            return (
-                "Silicon replay is using a phase-space base whose name does not look like an SOI/silicon phase space. "
-                "The manual SOI comparison uses PhaseSpace_seed1_100k_soi; replaying a different phase space through the silicon detector can change the high-y tail."
-            )
-        if state.amf_detector == "TEgas" and not any(
-            marker in token for marker in ("tegas", "te_gas", "tepc", "gas")
-        ):
-            return (
-                "TEgas replay is using a phase-space base whose name does not look like a TE gas or TEPC phase space."
-            )
-        return ""
-
 
 def decode_particle_identity(pdg_code: int) -> ParticleIdentity:
     abs_pdg = abs(pdg_code)

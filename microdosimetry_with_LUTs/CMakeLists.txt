@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(microdosimetry_with_LUTs
     src/main.cpp
     src/AmfResultParser.cpp
+    src/AmfGeometryDeriver.cpp
     src/AmfRunner.cpp
     src/AmfTemplateWriter.cpp
     src/InaniwaCalculator.cpp

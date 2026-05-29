@@ -95,9 +95,10 @@ space pair and `tsed.dat`, writes `replay_amf.txt`, and writes
 ./build/microdosimetry_with_LUTs AMF-stage \
   lookup_tables \
   input/PhaseSpace_curved_33mm \
+  /path/to/source_phase_space_simulation.txt \
   amf_runtime/staged_runs/PhaseSpace_curved_33mm_AMF_yD \
   AMF_yD \
-  --detector water \
+  --scoring-radius-mm 6.35 \
   --no-phase-space-precheck
 ```
 
@@ -108,9 +109,10 @@ space pair and `tsed.dat`, writes `replay_amf.txt`, and writes
   /path/to/topas \
   lookup_tables \
   input/PhaseSpace_curved_33mm \
+  /path/to/source_phase_space_simulation.txt \
   amf_runtime/staged_runs/PhaseSpace_curved_33mm_AMF_yD \
   AMF_yD \
-  --detector water \
+  --scoring-radius-mm 6.35 \
   --no-phase-space-precheck
 ```
 
@@ -120,46 +122,29 @@ Return codes:
 - `2`: TOPAS returned a nonzero exit code.
 - `3`: TOPAS exited successfully, but expected AMF output files were missing.
 
-## Detector Presets
+## Derived Replay Geometry
 
-Choose the replay detector with:
+AMF replay always generates a spherical `G4_WATER` detector named
+`AMFScoringVolume`. Manual detector type, scoring-coordinate, and world-size
+options are intentionally not accepted. The wrapper derives geometry from the
+source TOPAS file that generated the phase space:
 
-```bash
---detector water
---detector silicon
---detector TEgas
-```
+- finds the `PhaseSpace` scorer,
+- resolves its scored component and surface,
+- copies the source `G4_WATER` phantom placement,
+- places the water AMF sphere at the original phase-space scoring region,
+- validates the derived center against the phase-space coordinate bounds.
 
-Presets:
-
-- `water`: `10 cm x 10 cm x 1 mm` `G4_WATER` slab named `AMFScoringVolume`.
-- `silicon`: SOI active-layer approximation, `2.93 mm x 3.58 mm x 10 um`
-  `G4_Si` slab named `SOISensitiveLayer`.
-- `TEgas`: `6.35 mm` radius propane-gas sphere named `TEgasSV`.
-
-The detector should match the surface where the phase space was scored. A phase
-space scored on a TEPC gas sphere should be replayed with `--detector TEgas`.
-A phase space scored on a slab face should use the corresponding slab detector.
-
-Position the detector with:
-
-```bash
---scoring-x-mm 0 --scoring-y-mm 0 --scoring-z-mm -1387.4
-```
-
-Resize slab detectors with:
-
-```bash
---scoring-half-length-x-mm 50 \
---scoring-half-length-y-mm 50 \
---scoring-half-length-z-mm 0.5
-```
-
-Resize the TE-gas sphere with:
+Set the water AMF sphere radius with:
 
 ```bash
 --scoring-radius-mm 6.35
 ```
+
+The source TOPAS file must be resolved before use. If any live placeholder such
+as `${DEPTH}` or `${LATERAL}` remains, staging fails and the user must update
+the file before trying again. Geometry mismatches are fatal; there is no
+override option.
 
 ## Mandatory AMF Parameters
 
@@ -297,22 +282,16 @@ python3 macros/run_amf_depths.py \
   --topas /path/to/topas \
   --quantity AMF_yD \
   --input-dir input \
+  --source-topas /path/to/resolved_source_phase_space_simulation.txt \
   --lookup-root lookup_tables \
   --staged-root amf_runtime/staged_runs \
-  --auto-slab-geometry \
+  --scoring-radius-mm 6.35 \
   -- \
-  --detector water \
   --no-phase-space-precheck
 ```
 
-`--auto-slab-geometry` centers a water slab on each phase-space file's z-plane
-and defaults to a `10 cm x 10 cm x 1 mm` slab:
-
-```text
-X half-length = 50 mm
-Y half-length = 50 mm
-Z half-length = 0.5 mm
-```
+Each phase-space pair is validated against the supplied resolved source TOPAS
+file before TOPAS is launched.
 
 The script intentionally skips `.phsp` files that do not have same-base
 `.header` files.

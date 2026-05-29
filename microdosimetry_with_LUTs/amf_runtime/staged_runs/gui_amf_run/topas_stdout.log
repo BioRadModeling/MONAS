@@ -46,7 +46,7 @@ NeutronHP: /Inelastic file for Z = 18, A = 38 is not found and NeutronHP will us
 Phase Space file header indicates phase space is in TOPAS ASCII form.
 StoppingPowerCalculation: Topas
 StepCalculator: MidStep
-DomainRadius: 0.28 um
+DomainRadius: 0.48 um
 Visualization verbosity is now quiet (0)
 =======================================================================
 ======                 Electromagnetic Physics Parameters      ========
@@ -13952,21 +13952,21 @@ G4WT0 > Begin processing for Run: 0, History: 13247
 G4WT0 > Begin processing for Run: 0, History: 13248
 Cumulative Dose for each bin index:
 Bin Index 0: 1.3381e-19 Gy
-Microdosimetric spectra output written to PhaseSpace_curved_33mm_AMFSpectra_MicrodosimetricSpectra.csv
+Microdosimetric spectra output written to PhaseSpace_curved_33mm_water_AMFSpectra_MicrodosimetricSpectra.csv
 
 TOPAS run sequence complete.
 Particle source Demo: Total number of histories: 0
 Particle source Replay: Total number of histories: 13249
 
 Scorer: AMF
-Results have been written to file: PhaseSpace_curved_33mm_AMFSpectra.csv
+Results have been written to file: PhaseSpace_curved_33mm_water_AMFSpectra.csv
 
 Elapsed times:
-Parameter Reading : User=0.000000s Real=0.000890s Sys=0.000000s [Cpu=0.0%]
-    Initialization: User=0.140000s Real=0.232794s Sys=0.020000s [Cpu=68.7%]
-         Execution: User=2.660000s Real=3.277536s Sys=0.150000s [Cpu=85.7%]
-      Finalization: User=0.000000s Real=0.000218s Sys=0.000000s [Cpu=0.0%]
-             Total: User=2.8s Real=3.51144s Sys=0.17s
+Parameter Reading : User=0.010000s Real=0.001891s Sys=0.000000s [Cpu=528.7%]
+    Initialization: User=0.140000s Real=0.255805s Sys=0.020000s [Cpu=62.5%]
+         Execution: User=2.610000s Real=3.232143s Sys=0.160000s [Cpu=85.7%]
+      Finalization: User=0.000000s Real=0.000953s Sys=0.000000s [Cpu=0.0%]
+             Total: User=2.76s Real=3.49079s Sys=0.18s
 Non-critical error: mutex lock failure in ~G4Cache<N19G4ParticleHPAngular10toBeCachedE>. 
 If the RunManagerKernel has been deleted, it failed to delete an allocated resource
 and this destructor is being called after the statics were destroyed.

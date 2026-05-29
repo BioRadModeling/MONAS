@@ -118,19 +118,14 @@ class MainWindow(QMainWindow):
                 "Enabled mean-value modes: " + (", ".join(enabled) if enabled else "none")
             )
         elif state.approach == "amf":
-            if state.amf_run_mode == "replay":
-                approach_line = "AMF phase-space replay."
-                phase_space_display = str(state.amf_phase_space_base)
-                output_display = str(state.amf_staged_run_dir)
-            else:
-                approach_line = "AMF full simulation."
-                phase_space_display = str(state.amf_full_simulation_file)
-                output_display = str(state.amf_full_simulation_file.parent)
+            approach_line = "AMF phase-space replay."
+            phase_space_display = str(state.amf_phase_space_base)
+            output_display = str(state.amf_output_dir)
             detail_lines.extend(
                 [
-                    f"Quantity={state.amf_quantity}, detector={state.amf_detector}, domain radius={state.amf_domain_radius_um:g} um",
-                    f"Stopping power={state.amf_stopping_power}, step calculator={state.amf_step_calculator}",
-                    f"Scoring position=({state.amf_scoring_x_mm:g}, {state.amf_scoring_y_mm:g}, {state.amf_scoring_z_mm:g}) mm",
+                    f"Quantity={state.amf_quantity}, domain radius={state.amf_domain_radius_um:g} um",
+                    f"Stopping power={state.amf_stopping_power}",
+                    f"Source TOPAS simulation txt={state.amf_source_topas_file}",
                 ]
             )
 
@@ -232,11 +227,7 @@ class MainWindow(QMainWindow):
             return "Mean values only: " + (", ".join(enabled) if enabled else "no summary mode selected")
 
         if state.approach == "amf":
-            mode = "replay" if state.amf_run_mode == "replay" else "full simulation"
-            return (
-                f"AMF {mode}: {state.amf_quantity}, "
-                f"{state.amf_detector}, {state.amf_domain_radius_um:g} um"
-            )
+            return f"AMF replay: {state.amf_quantity}, {state.amf_domain_radius_um:g} um"
 
         return "No analysis approach selected"
 
