@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-import shutil
 
 from app.state import AppState
 
@@ -115,8 +114,6 @@ class InputChecker:
             errors.append(f"AMF tsed.dat not found: {state.lookup_root / 'AMF' / 'tsed.dat'}")
         if not state.executable_path.exists():
             errors.append(f"MONAS executable not found: {state.executable_path}")
-        if not self._is_executable_available(state.topas_executable_path):
-            errors.append(f"TOPAS executable not found: {state.topas_executable_path}")
         if not 0.0015 <= state.amf_domain_radius_um <= 0.5:
             errors.append("AMF domain radius must be between 0.0015 um and 0.5 um.")
 
@@ -355,12 +352,6 @@ class InputChecker:
                 ]
             )
         return "\n".join(lines)
-
-    @staticmethod
-    def _is_executable_available(path: Path) -> bool:
-        if path.is_absolute() or path.parent != Path("."):
-            return path.exists()
-        return shutil.which(str(path)) is not None
 
 def decode_particle_identity(pdg_code: int) -> ParticleIdentity:
     abs_pdg = abs(pdg_code)

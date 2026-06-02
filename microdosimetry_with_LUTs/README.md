@@ -522,11 +522,11 @@ amf_runtime/staged_runs/PhaseSpace_curved_33mm_yD/PhaseSpace_curved_33mm.header
 
 ### Run TOPAS through the wrapper
 
-Use a TOPAS executable that has the AMF extension compiled in:
+`AMF-run` launches `topas` from your `PATH`. Use a TOPAS build that has the AMF
+extension compiled in:
 
 ```bash
 ./build/microdosimetry_with_LUTs AMF-run \
-  /path/to/topas \
   lookup_tables \
   input/PhaseSpace_curved_33mm \
   /path/to/source_phase_space_simulation.txt \

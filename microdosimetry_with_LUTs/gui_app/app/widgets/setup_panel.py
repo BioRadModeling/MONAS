@@ -216,8 +216,6 @@ class SetupPanel(QWidget):
         layout.addLayout(grid)
 
         paths_form = QFormLayout()
-        self.topas_executable_edit = QLineEdit()
-        self.topas_executable_edit.setReadOnly(True)
         self.amf_phase_space_base_edit = QLineEdit()
         self.amf_phase_space_base_edit.setReadOnly(True)
         self.amf_source_topas_file_edit = QLineEdit()
@@ -244,10 +242,6 @@ class SetupPanel(QWidget):
         )
 
         self.amf_paths_form = paths_form
-        paths_form.addRow(
-            "TOPAS executable",
-            self._row_with_browse(self.topas_executable_edit, self._choose_topas_executable),
-        )
         paths_form.addRow("Phase-space base", self.amf_replay_base_row)
         paths_form.addRow("Source TOPAS simulation txt", self.amf_source_topas_file_row)
         paths_form.addRow("Output directory", self.amf_output_dir_row)
@@ -427,17 +421,6 @@ class SetupPanel(QWidget):
             self.output_dir_edit.setText(path)
             self._sync_state_from_widgets()
 
-    def _choose_topas_executable(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Choose TOPAS executable",
-            str(self._state.topas_executable_path.parent),
-            "Executables (*);;All files (*)",
-        )
-        if path:
-            self.topas_executable_edit.setText(path)
-            self._sync_state_from_widgets()
-
     def _choose_amf_phase_space_base(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -519,7 +502,6 @@ class SetupPanel(QWidget):
         self.magini_checkbox.setChecked(state.enable_magini)
         self.inaniwa_checkbox.setChecked(state.enable_inaniwa)
 
-        self.topas_executable_edit.setText(str(state.topas_executable_path))
         self.amf_quantity_combo.setCurrentText(state.amf_quantity)
         self._set_domain_radius_controls(state.amf_domain_radius_um)
         self.amf_stopping_power_combo.setCurrentText(state.amf_stopping_power)
@@ -558,7 +540,6 @@ class SetupPanel(QWidget):
         self._state.enable_let = self.let_checkbox.isChecked()
         self._state.enable_magini = self.magini_checkbox.isChecked()
         self._state.enable_inaniwa = self.inaniwa_checkbox.isChecked()
-        self._state.topas_executable_path = Path(self.topas_executable_edit.text())
         self._state.amf_quantity = self.amf_quantity_combo.currentText()
         self._state.amf_domain_radius_um = self.amf_domain_radius_input.value()
         self._state.amf_stopping_power = self.amf_stopping_power_combo.currentText()

@@ -122,7 +122,6 @@ def _build_amf_command_specs(state: AppState) -> list[CommandSpec]:
     amf_args = [
         str(state.executable_path),
         "AMF-run",
-        str(state.topas_executable_path),
         str(state.lookup_root),
         str(state.amf_phase_space_base),
         str(state.amf_source_topas_file),

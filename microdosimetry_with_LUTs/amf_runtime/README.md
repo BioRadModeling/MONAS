@@ -55,7 +55,7 @@ transport.
 
 For phase-space replay, AMF needs:
 
-- a TOPAS executable compiled with the AMF extension,
+- `topas` available on `PATH`, compiled with the AMF extension,
 - a phase-space pair with matching base names, for example
   `input/PhaseSpace_curved_33mm.phsp` and
   `input/PhaseSpace_curved_33mm.header`,
@@ -106,7 +106,6 @@ space pair and `tsed.dat`, writes `replay_amf.txt`, and writes
 
 ```bash
 ./build/microdosimetry_with_LUTs AMF-run \
-  /path/to/topas \
   lookup_tables \
   input/PhaseSpace_curved_33mm \
   /path/to/source_phase_space_simulation.txt \
@@ -279,7 +278,6 @@ Use `macros/run_amf_depths.py` for multiple depth-specific phase-space pairs.
 
 ```bash
 python3 macros/run_amf_depths.py \
-  --topas /path/to/topas \
   --quantity AMF_yD \
   --input-dir input \
   --source-topas /path/to/resolved_source_phase_space_simulation.txt \

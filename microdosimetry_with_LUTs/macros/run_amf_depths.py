@@ -22,11 +22,6 @@ def parse_args():
         help="Path to the microdosimetry_with_LUTs executable.",
     )
     parser.add_argument(
-        "--topas",
-        default=None,
-        help="Path to a TOPAS executable compiled with the AMF extension.",
-    )
-    parser.add_argument(
         "--lookup-root",
         default="lookup_tables",
         help="Lookup root containing AMF/tsed.dat.",
@@ -133,11 +128,6 @@ def main():
     if not input_dir.is_dir():
         raise NotADirectoryError(f"Input directory not found: {input_dir}")
 
-    if not args.stage_only:
-        if args.topas is None:
-            raise ValueError("--topas is required unless --stage-only is used")
-        require_existing_file(Path(args.topas), "TOPAS executable")
-
     phase_space_bases, missing_headers = discover_phase_spaces(
         input_dir, args.pattern
     )
@@ -172,7 +162,6 @@ def main():
             command = [
                 str(app),
                 "AMF-run",
-                str(args.topas),
                 str(lookup_root),
                 str(base),
                 str(source_topas),

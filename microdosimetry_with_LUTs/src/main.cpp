@@ -298,7 +298,7 @@ void printUsage(const char* programName) {
         << " [--phase-space-precheck|--no-phase-space-precheck]"
         << " [--output-file name]\n"
         << "    " << programName
-        << " AMF-run <topasExecutable> <lookupRoot> <phaseSpaceBase> <sourceTopasTxt> "
+        << " AMF-run <lookupRoot> <phaseSpaceBase> <sourceTopasTxt> "
         << "<stagedRunDir> <AMFSpectra|AMF_yD|AMF_yS> [same options]\n";
 }
 
@@ -354,27 +354,26 @@ int main(int argc, char* argv[]) {
         }
 
         if (mode == "AMF-run") {
-            if (argc < 8) {
+            if (argc < 7) {
                 throw std::runtime_error(
-                    "AMF-run requires: <topasExecutable> <lookupRoot> "
-                    "<phaseSpaceBase> <sourceTopasTxt> <stagedRunDir> "
+                    "AMF-run requires: <lookupRoot> <phaseSpaceBase> "
+                    "<sourceTopasTxt> <stagedRunDir> "
                     "<AMFSpectra|AMF_yD|AMF_yS>");
             }
 
             AmfConfig config;
-            config.topasExecutable = argv[2];
-            const fs::path lookupRoot = argv[3];
+            const fs::path lookupRoot = argv[2];
             config.tsedPath = lookupRoot / "AMF" / "tsed.dat";
-            config.phaseSpaceBasePath = argv[4];
-            config.sourceTopasPath = argv[5];
-            config.stagedRunDir = argv[6];
-            config.quantity = parseAmfQuantity(argv[7]);
+            config.phaseSpaceBasePath = argv[3];
+            config.sourceTopasPath = argv[4];
+            config.stagedRunDir = argv[5];
+            config.quantity = parseAmfQuantity(argv[6]);
             config.outputFile =
                 config.phaseSpaceBasePath.filename().string() + "_" +
                 toTopasQuantityName(config.quantity);
 
             const bool sawScoringRadius =
-                parseOptionalAmfStageArgs(argc, argv, 8, config);
+                parseOptionalAmfStageArgs(argc, argv, 7, config);
             if (!sawScoringRadius) {
                 throw std::runtime_error(
                     "AMF-run requires --scoring-radius-mm.");
