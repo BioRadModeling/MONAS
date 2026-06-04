@@ -145,6 +145,8 @@ void AmfTemplateWriter::writeReplayParameterFile(
 
     out << "# Generated TOPAS AMF phase-space replay file\n";
     out << "# Keep tsed.dat in the same directory where this file is launched.\n\n";
+    out << "# TOPAS phase-space replay can encounter rare excited-state ion PDG codes.\n";
+    out << "b:Ts/TreatExcitedIonsAsGroundState = \"True\"\n\n";
 
     writeCommonSource(out, config);
     writeGeometry(out, config);
