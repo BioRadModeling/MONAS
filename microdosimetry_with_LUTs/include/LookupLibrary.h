@@ -24,7 +24,8 @@ public:
     static LutFamily inferFamily(const std::string& lutName);
 
     void loadFromDirectory(const std::filesystem::path& libraryDir,
-                           LutFamily family);
+                           LutFamily family,
+                           bool loadCartechiniFallback = true);
 
     const LookupTable& findNearest(double energyMeV) const;
     std::size_t findNearestIndex(double energyMeV) const;

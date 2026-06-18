@@ -292,8 +292,10 @@ class SetupPanel(QWidget):
         self.decunha_voxel_combo.addItems(["1mm", "5um"])
         self.decunha_grid_combo = QComboBox()
         self.decunha_grid_combo.addItems(["linear", "log"])
+        self.cartechini_particle_combo = QComboBox()
+        self.cartechini_particle_combo.addItems(["proton", "carbon", "alpha"])
         self.cartechini_radius_combo = QComboBox()
-        self.cartechini_radius_combo.addItems(["0.5um", "8um"])
+        self.cartechini_radius_combo.addItems(["0.5um", "1.0um", "8um"])
         self.rebin_samples_spin = QSpinBox()
         self.rebin_samples_spin.setRange(1, 100_000_000)
         self.rebin_seed_spin = QSpinBox()
@@ -301,6 +303,7 @@ class SetupPanel(QWidget):
         for widget in (
             self.decunha_voxel_combo,
             self.decunha_grid_combo,
+            self.cartechini_particle_combo,
             self.cartechini_radius_combo,
             self.rebin_samples_spin,
             self.rebin_seed_spin,
@@ -311,18 +314,21 @@ class SetupPanel(QWidget):
         grid.addWidget(self.decunha_voxel_combo, 0, 1)
         grid.addWidget(QLabel("DeCunha energy grid"), 1, 0)
         grid.addWidget(self.decunha_grid_combo, 1, 1)
-        grid.addWidget(QLabel("Cartechini radius"), 2, 0)
-        grid.addWidget(self.cartechini_radius_combo, 2, 1)
-        grid.addWidget(QLabel("Rebin samples"), 3, 0)
-        grid.addWidget(self.rebin_samples_spin, 3, 1)
-        grid.addWidget(QLabel("Rebin seed"), 4, 0)
-        grid.addWidget(self.rebin_seed_spin, 4, 1)
+        grid.addWidget(QLabel("Cartechini particle"), 2, 0)
+        grid.addWidget(self.cartechini_particle_combo, 2, 1)
+        grid.addWidget(QLabel("Cartechini radius"), 3, 0)
+        grid.addWidget(self.cartechini_radius_combo, 3, 1)
+        grid.addWidget(QLabel("Rebin samples"), 4, 0)
+        grid.addWidget(self.rebin_samples_spin, 4, 1)
+        grid.addWidget(QLabel("Rebin seed"), 5, 0)
+        grid.addWidget(self.rebin_seed_spin, 5, 1)
         grid.setColumnStretch(1, 1)
         layout.addLayout(grid)
 
         for widget in (
             self.decunha_voxel_combo,
             self.decunha_grid_combo,
+            self.cartechini_particle_combo,
             self.cartechini_radius_combo,
         ):
             widget.currentIndexChanged.connect(self._sync_state_from_widgets)
@@ -494,6 +500,7 @@ class SetupPanel(QWidget):
         self.cartechini_radio.setChecked(state.spectrum_family == "Cartechini")
         self.decunha_voxel_combo.setCurrentText(state.decunha_voxel_size)
         self.decunha_grid_combo.setCurrentText(state.decunha_energy_grid)
+        self.cartechini_particle_combo.setCurrentText(state.cartechini_particle)
         self.cartechini_radius_combo.setCurrentText(state.cartechini_radius)
         self.rebin_samples_spin.setValue(state.rebin_samples)
         self.rebin_seed_spin.setValue(state.rebin_seed)
@@ -534,6 +541,7 @@ class SetupPanel(QWidget):
         self._state.spectrum_family = spectrum_family
         self._state.decunha_voxel_size = self.decunha_voxel_combo.currentText()
         self._state.decunha_energy_grid = self.decunha_grid_combo.currentText()
+        self._state.cartechini_particle = self.cartechini_particle_combo.currentText()
         self._state.cartechini_radius = self.cartechini_radius_combo.currentText()
         self._state.rebin_samples = self.rebin_samples_spin.value()
         self._state.rebin_seed = self.rebin_seed_spin.value()
@@ -561,6 +569,7 @@ class SetupPanel(QWidget):
         decunha_selected = self._state.spectrum_family == "DeCunha"
         self.decunha_voxel_combo.setEnabled(decunha_selected)
         self.decunha_grid_combo.setEnabled(decunha_selected)
+        self.cartechini_particle_combo.setEnabled(not decunha_selected)
         self.cartechini_radius_combo.setEnabled(not decunha_selected)
 
         external_selected = self._state.amf_stopping_power == "ExternalTable"

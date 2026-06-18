@@ -354,6 +354,9 @@ class ResultsLoader:
                 score -= 25
 
             if family == "cartechini":
+                particle_token = state.cartechini_particle.lower()
+                if particle_token in name:
+                    score -= 10
                 radius_token = state.cartechini_radius.replace("um", "").lower()
                 if radius_token in name:
                     score -= 10
@@ -377,6 +380,7 @@ class ResultsLoader:
         if state.approach == "spectrum" and (
             name.startswith("poly_spectrum")
             or name.startswith("poly_spectrum_moments")
+            or name.startswith("particle_matches")
             or name.startswith("proton_matches")
             or "_vs_y_" in name
         ):
@@ -415,6 +419,7 @@ class ResultsLoader:
         for stem in (
             "poly_spectrum_moments",
             "poly_spectrum",
+            "particle_matches",
             "proton_matches",
             "let_summary",
             "magini_summary",

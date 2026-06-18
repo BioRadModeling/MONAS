@@ -36,6 +36,7 @@ def build_command_specs(state: AppState) -> list[CommandSpec]:
                         "build-spectrum",
                         lookup_root,
                         "Cartechini",
+                        state.cartechini_particle,
                         state.cartechini_radius,
                         phase_space_file,
                         output_dir,
@@ -195,7 +196,7 @@ def planned_output_files(state: AppState) -> list[Path]:
 
     if state.approach == "spectrum":
         return [
-            output_dir / "proton_matches.csv",
+            output_dir / "particle_matches.csv",
             output_dir / "poly_spectrum.csv",
             output_dir / "poly_spectrum_moments.csv",
         ]

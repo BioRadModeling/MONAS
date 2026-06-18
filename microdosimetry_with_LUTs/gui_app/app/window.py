@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
                 )
             else:
                 detail_lines.append(
-                    f"Cartechini settings: radius={state.cartechini_radius}"
+                    f"Cartechini settings: particle={state.cartechini_particle}, radius={state.cartechini_radius}"
                 )
         elif state.approach == "means":
             approach_line = "Mean values only."
@@ -214,7 +214,10 @@ class MainWindow(QMainWindow):
                     "Spectrum build with DeCunha "
                     f"({state.decunha_voxel_size}, {state.decunha_energy_grid})"
                 )
-            return f"Spectrum build with Cartechini ({state.cartechini_radius})"
+            return (
+                "Spectrum build with Cartechini "
+                f"({state.cartechini_particle}, {state.cartechini_radius})"
+            )
 
         if state.approach == "means":
             enabled: list[str] = []

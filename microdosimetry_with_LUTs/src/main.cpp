@@ -122,6 +122,14 @@ std::string resolveCartechiniRadiusFolder(const std::string& radius) {
         return "R0.5";
     }
 
+    if (normalized == "1" || normalized == "1.0" ||
+        normalized == "1um" || normalized == "1.0um" ||
+        normalized == "1_um" || normalized == "1.0_um" ||
+        normalized == "1-um" || normalized == "1.0-um" ||
+        normalized == "r1" || normalized == "r1.0") {
+        return "R1.0";
+    }
+
     if (normalized == "8" || normalized == "8.0" ||
         normalized == "8um" || normalized == "8.0um" ||
         normalized == "8_um" || normalized == "8.0_um" ||
@@ -132,9 +140,66 @@ std::string resolveCartechiniRadiusFolder(const std::string& radius) {
 
     throw std::runtime_error(
         "Invalid Cartechini scoring radius '" + radius +
-        "'. Expected 0.5um or 8um.\n"
+        "'. Expected 0.5um, 1.0um, or 8um.\n"
         "Usage: ./microdosimetry_with_LUTs build-spectrum <lookupRoot> "
-        "Cartechini <0.5um|8um> <phspFile> <outputDir> [options]");
+        "Cartechini <proton|carbon|alpha> <0.5um|1.0um|8um> "
+        "<phspFile> <outputDir> [options]");
+}
+
+std::string resolveCartechiniParticleFolder(const std::string& particle) {
+    const std::string normalized = toLower(particle);
+
+    if (normalized == "proton" || normalized == "p" ||
+        normalized == "h" || normalized == "hydrogen") {
+        return "proton";
+    }
+    if (normalized == "carbon" || normalized == "c") {
+        return "carbon";
+    }
+    if (normalized == "alpha" || normalized == "helium" ||
+        normalized == "he") {
+        return "alpha";
+    }
+
+    throw std::runtime_error(
+        "Invalid Cartechini particle '" + particle +
+        "'. Expected proton, carbon, or alpha.");
+}
+
+std::string displayCartechiniParticle(const std::string& particleFolder) {
+    if (particleFolder == "proton") {
+        return "proton";
+    }
+    if (particleFolder == "carbon") {
+        return "carbon";
+    }
+    if (particleFolder == "alpha") {
+        return "alpha";
+    }
+    return particleFolder;
+}
+
+bool matchesCartechiniParticle(const ChargedParticleRecord& particle,
+                               const std::string& particleFolder) {
+    if (particleFolder == "proton") {
+        return particle.pdgCode == 2212 ||
+               (particle.atomicNumber == 1 && particle.massNumber == 1);
+    }
+    if (particleFolder == "carbon") {
+        return particle.atomicNumber == 6 && particle.massNumber > 0;
+    }
+    if (particleFolder == "alpha") {
+        return particle.atomicNumber == 2 && particle.massNumber == 4;
+    }
+    return false;
+}
+
+fs::path resolveCartechiniLibraryDir(const fs::path& lookupRoot,
+                                     const std::string& lutName,
+                                     const std::string& particle,
+                                     const std::string& radius) {
+    return lookupRoot / lutName / resolveCartechiniRadiusFolder(radius) /
+           resolveCartechiniParticleFolder(particle);
 }
 
 fs::path resolveLibraryDir(const fs::path& lookupRoot,
@@ -257,11 +322,14 @@ void printUsage(const char* programName) {
         << "Usage:\n"
         << "  Cartechini:\n"
         << "    " << programName
-        << " test-lookup <lookupRoot> Cartechini <0.5um|8um> <testEnergyMeV>\n"
+        << " test-lookup <lookupRoot> Cartechini <proton|carbon|alpha> "
+        << "<0.5um|1.0um|8um> <testEnergyMeV>\n"
         << "    " << programName
-        << " audit-phsp <lookupRoot> Cartechini <0.5um|8um> <phspFile> <outputDir>\n"
+        << " audit-phsp <lookupRoot> Cartechini <proton|carbon|alpha> "
+        << "<0.5um|1.0um|8um> <phspFile> <outputDir>\n"
         << "    " << programName
-        << " build-spectrum <lookupRoot> Cartechini <0.5um|8um> <phspFile> <outputDir>"
+        << " build-spectrum <lookupRoot> Cartechini <proton|carbon|alpha> "
+        << "<0.5um|1.0um|8um> <phspFile> <outputDir>"
         << " [--rebin-samples N] [--rebin-seed S]\n"
         << "\n"
         << "  DeCunha:\n"
@@ -537,17 +605,19 @@ int main(int argc, char* argv[]) {
 
             fs::path libraryDir;
             double testEnergyMeV = 0.0;
+            std::string cartechiniParticle;
 
             if (family == LutFamily::Cartechini) {
-                if (argc != 6) {
+                if (argc != 7) {
                     throw std::runtime_error(
-                        "Cartechini test-lookup requires: <lookupRoot> Cartechini <0.5um|8um> <testEnergyMeV>");
+                        "Cartechini test-lookup requires: <lookupRoot> Cartechini <proton|carbon|alpha> <0.5um|1.0um|8um> <testEnergyMeV>");
                 }
 
-                const std::string scoringRadius = argv[4];
-                testEnergyMeV = std::stod(argv[5]);
-                libraryDir = resolveLibraryDir(lookupRoot, lutName, family,
-                                              scoringRadius, "");
+                cartechiniParticle = resolveCartechiniParticleFolder(argv[4]);
+                const std::string scoringRadius = argv[5];
+                testEnergyMeV = std::stod(argv[6]);
+                libraryDir = resolveCartechiniLibraryDir(
+                    lookupRoot, lutName, cartechiniParticle, scoringRadius);
             } else {
                 if (argc != 7) {
                     throw std::runtime_error(
@@ -566,7 +636,10 @@ int main(int argc, char* argv[]) {
             }
 
             LookupLibrary library;
-            library.loadFromDirectory(libraryDir, family);
+            library.loadFromDirectory(
+                libraryDir,
+                family,
+                family != LutFamily::Cartechini || cartechiniParticle == "proton");
 
             const InterpolationMatch match =
                 library.findInterpolationMatch(testEnergyMeV);
@@ -601,27 +674,29 @@ int main(int argc, char* argv[]) {
             fs::path libraryDir;
             fs::path phspFile;
             fs::path outputDir;
+            std::string cartechiniParticle;
             int firstOptionalArgIndex = argc;
 
             if (family == LutFamily::Cartechini) {
                 if (mode == "audit-phsp") {
-                    if (argc != 7) {
+                    if (argc != 8) {
                         throw std::runtime_error(
-                            "Cartechini audit-phsp requires: <lookupRoot> Cartechini <0.5um|8um> <phspFile> <outputDir>");
+                            "Cartechini audit-phsp requires: <lookupRoot> Cartechini <proton|carbon|alpha> <0.5um|1.0um|8um> <phspFile> <outputDir>");
                     }
                 } else {
-                    if (argc < 7) {
+                    if (argc < 8) {
                         throw std::runtime_error(
-                            "Cartechini build-spectrum requires: <lookupRoot> Cartechini <0.5um|8um> <phspFile> <outputDir> [--rebin-samples N] [--rebin-seed S]");
+                            "Cartechini build-spectrum requires: <lookupRoot> Cartechini <proton|carbon|alpha> <0.5um|1.0um|8um> <phspFile> <outputDir> [--rebin-samples N] [--rebin-seed S]");
                     }
                 }
 
-                const std::string scoringRadius = argv[4];
-                libraryDir = resolveLibraryDir(lookupRoot, lutName, family,
-                                              scoringRadius, "");
-                phspFile = argv[5];
-                outputDir = argv[6];
-                firstOptionalArgIndex = 7;
+                cartechiniParticle = resolveCartechiniParticleFolder(argv[4]);
+                const std::string scoringRadius = argv[5];
+                libraryDir = resolveCartechiniLibraryDir(
+                    lookupRoot, lutName, cartechiniParticle, scoringRadius);
+                phspFile = argv[6];
+                outputDir = argv[7];
+                firstOptionalArgIndex = 8;
             } else {
                 if (mode == "audit-phsp") {
                     if (argc != 8) {
@@ -657,21 +732,49 @@ int main(int argc, char* argv[]) {
             }
 
             LookupLibrary library;
-            library.loadFromDirectory(libraryDir, family);
+            library.loadFromDirectory(
+                libraryDir,
+                family,
+                family != LutFamily::Cartechini || cartechiniParticle == "proton");
 
             PhaseSpaceReader reader;
-            const std::vector<ProtonRecord> protons = reader.readProtons(phspFile);
+            std::vector<ChargedParticleRecord> selectedParticles;
+            std::string selectedParticleLabel = "proton";
+            if (family == LutFamily::Cartechini) {
+                selectedParticleLabel = displayCartechiniParticle(cartechiniParticle);
+                const std::vector<ChargedParticleRecord> chargedParticles =
+                    reader.readChargedParticles(phspFile);
+                selectedParticles.reserve(chargedParticles.size());
+                for (const auto& particle : chargedParticles) {
+                    if (matchesCartechiniParticle(particle, cartechiniParticle)) {
+                        selectedParticles.push_back(particle);
+                    }
+                }
+            } else {
+                const std::vector<ProtonRecord> protons = reader.readProtons(phspFile);
+                selectedParticles.reserve(protons.size());
+                for (const auto& proton : protons) {
+                    selectedParticles.push_back(ChargedParticleRecord{
+                        proton.rowIndex,
+                        proton.energyMeV,
+                        proton.weight,
+                        proton.pdgCode,
+                        proton.atomicNumber,
+                        proton.massNumber
+                    });
+                }
+            }
 
             fs::create_directories(outputDir);
 
-            std::vector<ProtonMatchRecord> matches;
-            matches.reserve(protons.size());
+            std::vector<ParticleMatchRecord> matches;
+            matches.reserve(selectedParticles.size());
 
             SpectrumAccumulator accumulator(library, rebinSamples, rebinSeed);
 
-            for (const auto& proton : protons) {
+            for (const auto& particle : selectedParticles) {
                 const InterpolationMatch match =
-                    library.findInterpolationMatch(proton.energyMeV);
+                    library.findInterpolationMatch(particle.energyMeV);
                 const LookupTable& lowerMatch = library.tables()[match.lowerIndex];
                 const LookupTable& upperMatch = library.tables()[match.upperIndex];
 
@@ -684,10 +787,10 @@ int main(int argc, char* argv[]) {
                         ? "Cartechini"
                         : "DeCunha";
 
-                matches.push_back(ProtonMatchRecord{
-                    proton.rowIndex,
-                    proton.energyMeV,
-                    proton.weight,
+                matches.push_back(ParticleMatchRecord{
+                    particle.rowIndex,
+                    particle.energyMeV,
+                    particle.weight,
                     lowerMatch.monoEnergyMeV(),
                     upperMatch.monoEnergyMeV(),
                     match.lowerWeight,
@@ -706,17 +809,18 @@ int main(int argc, char* argv[]) {
                         match.upperIndex,
                         match.lowerWeight,
                         match.upperWeight,
-                        proton.weight);
+                        particle.weight);
                 }
             }
 
-            const fs::path matchCsv = outputDir / "proton_matches.csv";
-            CsvWriter::writeProtonMatches(matchCsv, matches);
+            const fs::path matchCsv = outputDir / "particle_matches.csv";
+            CsvWriter::writeParticleMatches(matchCsv, matches);
 
             std::cout << "Phase-space processing completed.\n";
             std::cout << "Library folder: " << libraryDir << "\n";
             std::cout << "Phase-space file: " << phspFile << "\n";
-            std::cout << "Protons found: " << protons.size() << "\n";
+            std::cout << "Selected particle: " << selectedParticleLabel << "\n";
+            std::cout << "Selected particles found: " << selectedParticles.size() << "\n";
             std::cout << "Match CSV: " << matchCsv << "\n";
 
             if (mode == "build-spectrum") {

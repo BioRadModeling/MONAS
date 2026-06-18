@@ -7,6 +7,26 @@
 
 namespace fs = std::filesystem;
 
+namespace {
+
+fs::path lookupRootForCartechiniLibrary(const fs::path& libraryDir) {
+    fs::path current = libraryDir;
+    while (!current.empty()) {
+        if (current.filename() == "Cartechini") {
+            return current.parent_path();
+        }
+        const fs::path parent = current.parent_path();
+        if (parent == current) {
+            break;
+        }
+        current = parent;
+    }
+
+    return libraryDir.parent_path();
+}
+
+}  // namespace
+
 LutFamily LookupLibrary::inferFamily(const std::string& lutName) {
     if (lutName == "Cartechini") {
         return LutFamily::Cartechini;
@@ -147,7 +167,8 @@ void LookupLibrary::rebuildFamilyIndexCaches() {
 }
 
 void LookupLibrary::loadFromDirectory(const fs::path& libraryDir,
-                                      LutFamily family) {
+                                      LutFamily family,
+                                      bool loadCartechiniFallback) {
     tables_.clear();
     yReference_.clear();
     cartechiniIndices_.clear();
@@ -168,22 +189,20 @@ void LookupLibrary::loadFromDirectory(const fs::path& libraryDir,
     if (family == LutFamily::Cartechini) {
         loadCartechiniDirectory(libraryDir);
 
-        fs::path lookupRoot = libraryDir.parent_path();
-        const std::string folderName = libraryDir.filename().string();
-        if (folderName == "R0.5" || folderName == "R8.0") {
-            lookupRoot = lookupRoot.parent_path();
+        if (loadCartechiniFallback) {
+            const fs::path lookupRoot = lookupRootForCartechiniLibrary(libraryDir);
+
+            const fs::path fallbackDir =
+                lookupRoot / "DeCunha" / "1mm_logarithmic";
+
+            if (!fs::exists(fallbackDir) || !fs::is_directory(fallbackDir)) {
+                throw std::runtime_error(
+                    "Missing Cartechini fallback DeCunha directory: " +
+                    fallbackDir.string());
+            }
+
+            loadDeCunhaDirectory(fallbackDir);
         }
-
-        const fs::path fallbackDir =
-            lookupRoot / "DeCunha" / "1mm_logarithmic";
-
-        if (!fs::exists(fallbackDir) || !fs::is_directory(fallbackDir)) {
-            throw std::runtime_error(
-                "Missing Cartechini fallback DeCunha directory: " +
-                fallbackDir.string());
-        }
-
-        loadDeCunhaDirectory(fallbackDir);
     } else {
         loadDeCunhaDirectory(libraryDir);
     }
@@ -204,7 +223,11 @@ void LookupLibrary::loadFromDirectory(const fs::path& libraryDir,
 
     rebuildFamilyIndexCaches();
 
-    yReference_ = tables_.front().yLowerEdges();
+    if (family == LutFamily::Cartechini && !cartechiniIndices_.empty()) {
+        yReference_ = tables_[cartechiniIndices_.front()].yLowerEdges();
+    } else {
+        yReference_ = tables_.front().yLowerEdges();
+    }
 
     if (family == LutFamily::DeCunha) {
         validateConsistentYGrid();

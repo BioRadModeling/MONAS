@@ -4,9 +4,9 @@
 #include <fstream>
 #include <stdexcept>
 
-void CsvWriter::writeProtonMatches(
+void CsvWriter::writeParticleMatches(
     const std::filesystem::path& outPath,
-    const std::vector<ProtonMatchRecord>& matches) {
+    const std::vector<ParticleMatchRecord>& matches) {
     std::ofstream out(outPath);
     if (!out) {
         throw std::runtime_error(

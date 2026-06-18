@@ -11,8 +11,9 @@ LET_ELEMENTS = ("H", "He", "Li", "Be", "B", "C", "N", "O")
 INANIWA_ATOMIC_NUMBERS = tuple(range(1, 11))
 PROTON_FILENAME_PATTERN = re.compile(r"^Proton_([0-9]+(?:\.[0-9]+)?)_MeV\.csv$")
 CARTECHINI_FILENAME_PATTERN = re.compile(
-    r"^H_E([0-9]+(?:\.[0-9]+)?)_R(?:0\.5|8(?:\.0)?)(?:_[^.]+)?\.txt$"
+    r"^H_E([0-9]+(?:\.[0-9]+)?)_R(?:0\.5|1\.0|8(?:\.0)?)(?:_[^.]+)?\.txt$"
 )
+CARTECHINI_SPECIES = ("proton", "carbon", "alpha")
 
 
 @dataclass
@@ -25,6 +26,7 @@ class PhaseSpaceScan:
     max_energy_mev: float | None = None
     species_counts: dict[str, int] = field(default_factory=dict)
     proton_energies: list[float] = field(default_factory=list)
+    cartechini_energies: dict[str, list[float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -77,7 +79,10 @@ class InputChecker:
 
         if scan.charged_rows == 0:
             warnings.append("No charged rows were found in the selected phase-space file.")
-        if scan.proton_rows == 0:
+        if not (
+            state.approach == "spectrum"
+            and state.spectrum_family == "Cartechini"
+        ) and scan.proton_rows == 0:
             warnings.append("No proton rows were found in the selected phase-space file.")
 
         if state.approach == "spectrum":
@@ -177,7 +182,10 @@ class InputChecker:
         if cached is not None:
             return cached
 
-        scan = PhaseSpaceScan(species_counts={element: 0 for element in LET_ELEMENTS})
+        scan = PhaseSpaceScan(
+            species_counts={element: 0 for element in LET_ELEMENTS},
+            cartechini_energies={species: [] for species in CARTECHINI_SPECIES},
+        )
 
         with phase_space_file.open("r", encoding="utf-8", errors="replace") as handle:
             for line in handle:
@@ -206,6 +214,10 @@ class InputChecker:
                     scan.proton_rows += 1
                     scan.proton_energies.append(energy_mev)
 
+                cartechini_species = cartechini_species_for_identity(identity, pdg_code)
+                if cartechini_species is not None:
+                    scan.cartechini_energies[cartechini_species].append(energy_mev)
+
                 let_family = let_family_for_pdg(pdg_code)
                 if let_family in LET_ELEMENTS:
                     scan.species_counts[let_family] += 1
@@ -233,23 +245,42 @@ class InputChecker:
         lut_range = self._read_spectrum_range(spectrum_dir)
         if lut_range is None:
             errors.append(
-                f"Could not determine proton energy range from LUT files in: {spectrum_dir}"
+                f"Could not determine energy range from LUT files in: {spectrum_dir}"
             )
             return
 
         low, high = lut_range
+        particle_label = "proton"
+        particle_energies = scan.proton_energies
+        if state.spectrum_family == "Cartechini":
+            particle_label = state.cartechini_particle
+            particle_energies = scan.cartechini_energies.get(particle_label, [])
+
+        if not particle_energies:
+            warnings.append(
+                f"No {particle_label} rows were found in the selected phase-space file."
+            )
+
         out_of_range = sum(
             1
-            for energy in scan.proton_energies
+            for energy in particle_energies
             if energy < low or energy > high
         )
         warnings.append(
             f"Spectrum LUT range: {low:.6g} to {high:.6g} MeV in {spectrum_dir.name}."
         )
         if out_of_range > 0:
-            warnings.append(
-                f"{out_of_range} proton rows sit outside the selected spectrum LUT range. If Cartechini selected, fallback to DeCunha will occur. If DeCunha selected, clamping to DeCunha high endpoint will occur."
-            )
+            if (
+                state.spectrum_family == "Cartechini"
+                and state.cartechini_particle != "proton"
+            ):
+                errors.append(
+                    f"{out_of_range} {particle_label} rows sit outside the selected Cartechini LUT range. No DeCunha fallback is available for carbon or alpha."
+                )
+            else:
+                warnings.append(
+                    f"{out_of_range} {particle_label} rows sit outside the selected spectrum LUT range. If Cartechini selected, fallback to DeCunha will occur. If DeCunha selected, clamping to DeCunha high endpoint will occur."
+                )
 
     def _add_means_warnings(
         self,
@@ -370,6 +401,21 @@ def decode_particle_identity(pdg_code: int) -> ParticleIdentity:
     return ParticleIdentity(False, 0, 0)
 
 
+def cartechini_species_for_identity(
+    identity: ParticleIdentity,
+    pdg_code: int,
+) -> str | None:
+    if pdg_code == 2212 or (
+        identity.atomic_number == 1 and identity.mass_number == 1
+    ):
+        return "proton"
+    if identity.atomic_number == 6 and identity.mass_number > 0:
+        return "carbon"
+    if identity.atomic_number == 2 and identity.mass_number == 4:
+        return "alpha"
+    return None
+
+
 def let_family_for_pdg(pdg_code: int) -> str | None:
     match pdg_code:
         case 2212 | 1000010010 | 1000010020 | 1000010030:
@@ -398,8 +444,12 @@ def let_family_for_pdg(pdg_code: int) -> str | None:
 
 def selected_spectrum_directory(state: AppState) -> Path:
     if state.spectrum_family == "Cartechini":
-        folder = "R0.5" if state.cartechini_radius == "0.5um" else "R8.0"
-        return state.lookup_root / "Cartechini" / folder
+        folder = {
+            "0.5um": "R0.5",
+            "1.0um": "R1.0",
+            "8um": "R8.0",
+        }[state.cartechini_radius]
+        return state.lookup_root / "Cartechini" / folder / state.cartechini_particle
 
     suffix = {
         ("1mm", "linear"): "1mm_linear",

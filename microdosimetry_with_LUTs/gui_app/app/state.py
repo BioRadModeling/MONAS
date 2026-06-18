@@ -15,6 +15,7 @@ class AppState:
     spectrum_family: str = "DeCunha"
     decunha_voxel_size: str = "1mm"
     decunha_energy_grid: str = "log"
+    cartechini_particle: str = "proton"
     cartechini_radius: str = "0.5um"
     rebin_samples: int = 1_000_000
     rebin_seed: int = 1_511_504_868

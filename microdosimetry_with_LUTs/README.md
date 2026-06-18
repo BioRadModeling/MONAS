@@ -1,13 +1,13 @@
 # microdosimetry_with_LUTs
 
-This module builds a **polyenergetic proton microdosimetric spectrum** from a TOPAS phase-space file and a library of precomputed monoenergetic lookup spectra.
+This module builds a **polyenergetic microdosimetric spectrum** from a TOPAS phase-space file and a library of precomputed monoenergetic lookup spectra.
 
 It does **not** run the full MONAS survival/RBE workflow. Its job is:
 
 1. read the phase-space file line by line,
-2. keep only proton rows,
-3. bracket each proton energy between two monoenergetic lookup spectra and linearly interpolate between them,
-4. combine all matched spectra using the proton weights,
+2. keep only the particle rows used by the selected LUT mode,
+3. bracket each particle energy between two monoenergetic lookup spectra and linearly interpolate between them,
+4. combine all matched spectra using the particle weights,
 5. save the final polyenergetic spectrum as a CSV,
 6. optional: plot selected quantities from that CSV as a JPEG.
 
@@ -21,7 +21,7 @@ The phase-space file is expected to be a plain-text TOPAS phase-space file.
 
 This code uses only these columns:
 
-- **column 6** = proton kinetic energy in MeV
+- **column 6** = particle kinetic energy in MeV
 - **column 7** = particle weight
 - **column 8** = particle type / PDG code
 
@@ -100,13 +100,24 @@ That means the interpolation weights collapse to one endpoint:
 
 ### Cartechini fallback behavior
 
-When the selected family is `Cartechini`, the code behaves in two regions:
+When the selected family is `Cartechini`, the user selects a particle
+(`proton`, `carbon`, or `alpha`) and a scoring radius (`0.5um`, `1.0um`, or
+`8um`). The LUT directory is resolved as:
+
+```text
+lookup_tables/Cartechini/<R0.5|R1.0|R8.0>/<proton|carbon|alpha>
+```
+
+For proton Cartechini runs, the code behaves in two regions:
 
 - for energies at or below the maximum Cartechini LUT energy, interpolation is
   done only within the Cartechini subset
 - for energies above the maximum Cartechini LUT energy, the code switches
   entirely to the fallback `DeCunha/1mm_logarithmic` subset and performs the
   interpolation there
+
+Carbon and alpha Cartechini runs do not use the DeCunha fallback because that
+fallback is proton-only.
 
 ---
 
@@ -168,8 +179,8 @@ deterministic overlap-based rebinning for robustness.
 
 After a successful run, you should see these files:
 
-### 1. `proton_matches.csv`
-A row-by-row audit file showing how each proton was matched.
+### 1. `particle_matches.csv`
+A row-by-row audit file showing how each selected particle was matched.
 
 Columns:
 
@@ -687,9 +698,9 @@ If this works, your lookup tables are being found and parsed correctly.
 
 ## Step 3: audit the phase-space file
 
-This reads the phase-space file, filters protons, brackets each proton energy
+This reads the phase-space file, filters the selected particles, brackets each energy
 between two LUT energies, computes the interpolation weights, and writes
-`proton_matches.csv`.
+`particle_matches.csv`.
 
 From `microdosimetry_with_LUTs/build`:
 
@@ -699,7 +710,7 @@ From `microdosimetry_with_LUTs/build`:
 
 What this means:
 
-- `audit-phsp` = read the phase-space file and create the proton match audit file
+- `audit-phsp` = read the phase-space file and create the particle match audit file
 - `../lookup_tables` = lookup-table root folder
 - `DeCunha` = name of the LUT to be used
 - `1mm` = use the 1 mm library
@@ -713,8 +724,9 @@ Expected output looks like:
 Phase-space audit completed.
 Library folder:     "../lookup_tables/csv/1mm_logarithmic"
 Phase-space file:   "../input/PhaseSpace.phsp"
-Protons found:      552711
-Output CSV:         "../output/proton_matches.csv"
+Selected particle:  proton
+Selected particles found: 552711
+Output CSV:         "../output/particle_matches.csv"
 ```
 
 If this works, the proton filtering and interpolation matching are working.
@@ -734,11 +746,11 @@ From `microdosimetry_with_LUTs/build`:
 This command:
 
 - reads the phase-space file,
-- keeps only protons,
-- interpolates each proton between two monoenergetic lookup spectra,
+- keeps only the selected particles,
+- interpolates each particle between two monoenergetic lookup spectra,
 - accumulates the weighted contributions,
 - writes:
-  - `../output/proton_matches.csv`
+  - `../output/particle_matches.csv`
   - `../output/poly_spectrum.csv`
   - `../output/poly_spectrum_moments.csv`
 
@@ -748,8 +760,9 @@ Expected output:
 Phase-space processing completed.
 Library folder:     "../lookup_tables/csv/1mm_logarithmic"
 Phase-space file:   "../input/PhaseSpace.phsp"
-Protons found:      552711
-Match CSV:          "../output/proton_matches.csv"
+Selected particle:  proton
+Selected particles found: 552711
+Match CSV:          "../output/particle_matches.csv"
 Poly spectrum CSV:  "../output/poly_spectrum.csv"
 Poly spectrum moments CSV:  "../output/poly_spectrum_moments.csv"
 ```
