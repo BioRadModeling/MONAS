@@ -2,11 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string>
 #include <vector>
 
 #include "LookupLibrary.h"
 #include "LookupTable.h"
+#include "SpectrumMoments.h"
 
 struct PolySpectrum {
     std::vector<double> y;
@@ -14,14 +14,6 @@ struct PolySpectrum {
     std::vector<double> yf;
     std::vector<double> d;
     std::vector<double> yd;
-};
-
-struct SpectrumDistributionMoments {
-    std::string distribution;
-    double meanKeVPerUm{0.0};
-    double varianceKeV2PerUm2{0.0};
-    double stdevKeVPerUm{0.0};
-    double skewness{0.0};
 };
 
 struct PolySpectrumMomentsSummary {
@@ -65,6 +57,8 @@ private:
 
     std::vector<double> numerator_;
     double denominator_{0.0};
+    RatioMeanStandardErrorAccumulator frequencyMeanError_;
+    RatioMeanStandardErrorAccumulator doseMeanError_;
 
     std::size_t rebinSamples_{1000000};
     std::uint64_t rebinSeed_{0x5A17C3E4ULL};

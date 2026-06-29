@@ -23,6 +23,18 @@ add_executable(microdosimetry_with_LUTs
     src/PhaseSpaceReader.cpp
     src/CsvWriter.cpp
     src/SpectrumAccumulator.cpp
+    src/SpectrumMoments.cpp
 )
 
 target_include_directories(microdosimetry_with_LUTs PRIVATE include)
+
+enable_testing()
+
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(
+        NAME amf_diagnostics
+        COMMAND ${Python3_EXECUTABLE} -m unittest discover -s tests
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+endif()

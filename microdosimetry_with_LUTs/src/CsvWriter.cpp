@@ -67,13 +67,14 @@ void CsvWriter::writePolySpectrumMoments(
     }
 
     out << "distribution,mean_keV_per_um,variance_keV2_per_um2,"
-        << "stdev_keV_per_um,skewness\n";
+        << "stdev_keV_per_um,mean_standard_error_keV_per_um,skewness\n";
 
     const auto writeRow = [&out](const SpectrumDistributionMoments& moments) {
         out << moments.distribution << ','
             << moments.meanKeVPerUm << ','
             << moments.varianceKeV2PerUm2 << ','
             << moments.stdevKeVPerUm << ','
+            << moments.meanStandardErrorKeVPerUm << ','
             << moments.skewness << '\n';
     };
 

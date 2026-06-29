@@ -315,6 +315,12 @@ void printAmfResultFileStatus(const AmfResultFiles& files) {
         std::cout << "Expected spectra CSV: " << *files.spectraCsvFile
                   << " [" << (spectraCsvExists ? "FOUND" : "MISSING") << "]\n";
     }
+
+    if (files.spectraMomentsCsvFile.has_value()) {
+        const bool spectraMomentsCsvExists = fs::exists(*files.spectraMomentsCsvFile);
+        std::cout << "Expected spectra moments CSV: " << *files.spectraMomentsCsvFile
+                  << " [" << (spectraMomentsCsvExists ? "FOUND" : "MISSING") << "]\n";
+    }
 }
 
 void printUsage(const char* programName) {

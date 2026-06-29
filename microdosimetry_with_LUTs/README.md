@@ -218,9 +218,13 @@ Columns:
 - `mean_keV_per_um`
 - `variance_keV2_per_um2`
 - `stdev_keV_per_um`
+- `mean_standard_error_keV_per_um`
 - `skewness`
 
 The file contains one row for `frequency` and one row for `dose`.
+`stdev_keV_per_um` is the width of the lineal-energy distribution itself.
+`mean_standard_error_keV_per_um` is the statistical uncertainty of the
+reported mean, estimated from particle-by-particle ratio statistics.
 
 ### 4. JPEG plot files
 Examples:
@@ -551,6 +555,25 @@ Supported AMF quantities are:
 - `AMFSpectra`: full microdosimetric spectra per scoring voxel
 - `AMF_yD`: dose-weighted mean lineal energy per scoring voxel
 - `AMF_yS`: saturation-corrected dose mean lineal energy per scoring voxel
+
+`AMFSpectra` writes both the dose-normalized spectrum and moments derived from
+that spectrum:
+
+```text
+<OutputFile>_MicrodosimetricSpectra.csv
+<OutputFile>_MicrodosimetricMoments.csv
+```
+
+The moments file contains two rows per scoring voxel, `frequency` and `dose`,
+with columns:
+
+```text
+x,y,z,distribution,mean_keV_per_um,variance_keV2_per_um2,stdev_keV_per_um,mean_standard_error_keV_per_um,skewness
+```
+
+For AMF spectra, the `frequency` mean is `yF` and the `dose` mean is `yD`.
+The standard error is estimated while the TOPAS scorer constructs the spectrum,
+using event-level ratio statistics.
 
 AMF replay no longer accepts manual detector, scoring-coordinate, or world-size
 inputs. The replay parser reads the source TOPAS file, finds the

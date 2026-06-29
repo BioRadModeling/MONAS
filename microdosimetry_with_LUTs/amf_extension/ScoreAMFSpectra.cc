@@ -26,6 +26,8 @@
 #include "G4EmCalculator.hh"
 #include "G4Material.hh"
 #include "G4Exception.hh"
+#include "G4RunManager.hh"
+#include "G4Event.hh"
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -39,6 +41,7 @@
 #include <map>
 #include <numeric>
 #include <cctype>
+#include <limits>
 
 ScoreAMFSpectra::ScoreAMFSpectra(TsParameterManager* pM, TsMaterialManager* mM, TsGeometryManager* gM, TsScoringManager* scM, TsExtensionManager* eM,
                      G4String scorerName, G4String quantity, G4String outFileName, G4bool isSubScorer)
@@ -119,6 +122,182 @@ ScoreAMFSpectra::ScoreAMFSpectra(TsParameterManager* pM, TsMaterialManager* mM, 
 
 ScoreAMFSpectra::~ScoreAMFSpectra() {}
 
+void ScoreAMFSpectra::RatioMomentAccumulator::AddSample(
+    G4double numerator,
+    G4double denominator) {
+
+    if (!std::isfinite(numerator) || !std::isfinite(denominator) ||
+        denominator <= 0.0) {
+        return;
+    }
+
+    ++count;
+    numeratorSum += numerator;
+    denominatorSum += denominator;
+    numeratorSquaredSum += numerator * numerator;
+    denominatorSquaredSum += denominator * denominator;
+    numeratorDenominatorSum += numerator * denominator;
+}
+
+void ScoreAMFSpectra::RatioMomentAccumulator::Absorb(
+    const RatioMomentAccumulator& other) {
+
+    count += other.count;
+    numeratorSum += other.numeratorSum;
+    denominatorSum += other.denominatorSum;
+    numeratorSquaredSum += other.numeratorSquaredSum;
+    denominatorSquaredSum += other.denominatorSquaredSum;
+    numeratorDenominatorSum += other.numeratorDenominatorSum;
+}
+
+G4double ScoreAMFSpectra::RatioMomentAccumulator::Mean() const {
+    if (!(denominatorSum > 0.0)) {
+        return std::numeric_limits<G4double>::quiet_NaN();
+    }
+
+    return numeratorSum / denominatorSum;
+}
+
+G4double ScoreAMFSpectra::RatioMomentAccumulator::StandardError() const {
+    if (count < 2 || !(denominatorSum > 0.0)) {
+        return std::numeric_limits<G4double>::quiet_NaN();
+    }
+
+    const G4double ratio = Mean();
+    if (!std::isfinite(ratio)) {
+        return std::numeric_limits<G4double>::quiet_NaN();
+    }
+
+    G4double residualSum =
+        numeratorSquaredSum
+        - 2.0 * ratio * numeratorDenominatorSum
+        + ratio * ratio * denominatorSquaredSum;
+
+    if (residualSum < 0.0 && std::abs(residualSum) < 1.0e-12) {
+        residualSum = 0.0;
+    }
+    if (residualSum < 0.0) {
+        return std::numeric_limits<G4double>::quiet_NaN();
+    }
+
+    const G4double variance =
+        (static_cast<G4double>(count) / static_cast<G4double>(count - 1))
+        * residualSum / (denominatorSum * denominatorSum);
+
+    if (variance < 0.0) {
+        return std::numeric_limits<G4double>::quiet_NaN();
+    }
+
+    return std::sqrt(variance);
+}
+
+ScoreAMFSpectra::SpectrumDistributionMoment
+ScoreAMFSpectra::ComputeDistributionMoments(
+    const std::vector<G4double>& yCenters,
+    const std::vector<G4double>& densityValues,
+    const std::string& distribution,
+    G4double meanStandardError) const {
+
+    SpectrumDistributionMoment moments;
+    moments.distribution = distribution;
+    moments.meanStandardErrorKeVPerUm = meanStandardError;
+
+    if (yCenters.size() != densityValues.size() || yCenters.size() < 2) {
+        moments.meanKeVPerUm = std::numeric_limits<G4double>::quiet_NaN();
+        moments.varianceKeV2PerUm2 = std::numeric_limits<G4double>::quiet_NaN();
+        moments.stdevKeVPerUm = std::numeric_limits<G4double>::quiet_NaN();
+        moments.skewness = std::numeric_limits<G4double>::quiet_NaN();
+        return moments;
+    }
+
+    const G4double normalizationFactor = std::log(10.0) * yStep;
+    G4double totalProbability = 0.0;
+
+    for (size_t i = 0; i < yCenters.size(); ++i) {
+        const G4double y = yCenters[i];
+        const G4double density = densityValues[i];
+
+        if (!(y > 0.0) || !std::isfinite(density) || density < 0.0) {
+            continue;
+        }
+
+        totalProbability += normalizationFactor * y * density;
+    }
+
+    if (!(totalProbability > 0.0)) {
+        moments.meanKeVPerUm = std::numeric_limits<G4double>::quiet_NaN();
+        moments.varianceKeV2PerUm2 = std::numeric_limits<G4double>::quiet_NaN();
+        moments.stdevKeVPerUm = std::numeric_limits<G4double>::quiet_NaN();
+        moments.skewness = std::numeric_limits<G4double>::quiet_NaN();
+        return moments;
+    }
+
+    G4double meanNumerator = 0.0;
+    for (size_t i = 0; i < yCenters.size(); ++i) {
+        const G4double y = yCenters[i];
+        const G4double density = densityValues[i];
+
+        if (!(y > 0.0) || !std::isfinite(density) || density < 0.0) {
+            continue;
+        }
+
+        const G4double probability = normalizationFactor * y * density;
+        meanNumerator += probability * y;
+    }
+    moments.meanKeVPerUm = meanNumerator / totalProbability;
+
+    G4double varianceNumerator = 0.0;
+    for (size_t i = 0; i < yCenters.size(); ++i) {
+        const G4double y = yCenters[i];
+        const G4double density = densityValues[i];
+
+        if (!(y > 0.0) || !std::isfinite(density) || density < 0.0) {
+            continue;
+        }
+
+        const G4double probability = normalizationFactor * y * density;
+        const G4double delta = y - moments.meanKeVPerUm;
+        varianceNumerator += probability * delta * delta;
+    }
+
+    moments.varianceKeV2PerUm2 = varianceNumerator / totalProbability;
+    if (moments.varianceKeV2PerUm2 < 0.0 &&
+        std::abs(moments.varianceKeV2PerUm2) < 1.0e-12) {
+        moments.varianceKeV2PerUm2 = 0.0;
+    }
+
+    if (moments.varianceKeV2PerUm2 < 0.0) {
+        moments.stdevKeVPerUm = std::numeric_limits<G4double>::quiet_NaN();
+        moments.skewness = std::numeric_limits<G4double>::quiet_NaN();
+        return moments;
+    }
+
+    moments.stdevKeVPerUm = std::sqrt(moments.varianceKeV2PerUm2);
+    if (moments.stdevKeVPerUm == 0.0) {
+        moments.skewness = 0.0;
+        return moments;
+    }
+
+    G4double skewnessNumerator = 0.0;
+    for (size_t i = 0; i < yCenters.size(); ++i) {
+        const G4double y = yCenters[i];
+        const G4double density = densityValues[i];
+
+        if (!(y > 0.0) || !std::isfinite(density) || density < 0.0) {
+            continue;
+        }
+
+        const G4double probability = normalizationFactor * y * density;
+        const G4double standardized =
+            (y - moments.meanKeVPerUm) / moments.stdevKeVPerUm;
+        skewnessNumerator +=
+            probability * standardized * standardized * standardized;
+    }
+
+    moments.skewness = skewnessNumerator / totalProbability;
+    return moments;
+}
+
 void ScoreAMFSpectra::initializeYGrid() {
     yhig.resize(nybin + 1);
 
@@ -126,6 +305,159 @@ void ScoreAMFSpectra::initializeYGrid() {
     for (size_t i = 0; i < yhig.size(); ++i) {
         yhig[i] = std::pow(10.0, ypower);
         ypower += yStep;
+    }
+}
+
+G4int ScoreAMFSpectra::GetCurrentEventId() const {
+    G4RunManager* runManager = G4RunManager::GetRunManager();
+    if (!runManager) {
+        return -1;
+    }
+
+    const G4Event* event = runManager->GetCurrentEvent();
+    if (!event) {
+        return -1;
+    }
+
+    return event->GetEventID();
+}
+
+void ScoreAMFSpectra::FlushCurrentEventMoments() {
+    for (const auto& eventPair : currentEventMoments) {
+        const G4int binIndex = eventPair.first;
+        const EventMomentContribution& contribution = eventPair.second;
+
+        doseMeanStats[binIndex].AddSample(
+            contribution.yDWeightedNumerator,
+            contribution.doseDenominator);
+        frequencyMeanStats[binIndex].AddSample(
+            contribution.yFWeightedNumerator,
+            contribution.yFWeightedDenominator);
+    }
+
+    currentEventMoments.clear();
+}
+
+void ScoreAMFSpectra::AccumulateCurrentEventMoments(
+    G4int binIndex,
+    G4double dose,
+    const std::vector<std::pair<double, double>>& microdosimetricSpectra) {
+
+    if (!(dose > 0.0)) {
+        return;
+    }
+
+    const double normalizationFactor = std::log(10.0) * yStep;
+    double yDStep = 0.0;
+    double inverseYFStep = 0.0;
+
+    for (const auto& bin : microdosimetricSpectra) {
+        const double y = bin.first;
+        const double yd = bin.second;
+
+        if (!(y > 0.0) || !std::isfinite(yd) || yd < 0.0) {
+            continue;
+        }
+
+        yDStep += normalizationFactor * y * yd;
+        inverseYFStep += normalizationFactor * yd / y;
+    }
+
+    if (!(yDStep > 0.0) || !(inverseYFStep > 0.0)) {
+        return;
+    }
+
+    EventMomentContribution& contribution = currentEventMoments[binIndex];
+    contribution.yDWeightedNumerator += dose * yDStep;
+    contribution.doseDenominator += dose;
+    contribution.yFWeightedNumerator += dose;
+    contribution.yFWeightedDenominator += dose * inverseYFStep;
+}
+
+void ScoreAMFSpectra::ComputeFinalSpectrumMoments() {
+    initializeYGrid();
+    spectrumMomentSummaries.clear();
+
+    std::vector<G4double> yCenters(nybin, 0.0);
+    for (size_t i = 0; i < yCenters.size(); ++i) {
+        yCenters[i] = (yhig[i] + yhig[i + 1]) / 2.0;
+    }
+
+    const G4double normalizationFactor = std::log(10.0) * yStep;
+
+    for (const auto& binPair : totalSpectra) {
+        const G4int binIndex = binPair.first;
+        const std::vector<G4double>& ydSpectrum = binPair.second;
+
+        if (ydSpectrum.size() != yCenters.size()) {
+            continue;
+        }
+
+        G4double doseProbabilityNorm = 0.0;
+        for (size_t i = 0; i < ydSpectrum.size(); ++i) {
+            const G4double yd = ydSpectrum[i];
+            if (std::isfinite(yd) && yd >= 0.0) {
+                doseProbabilityNorm += normalizationFactor * yd;
+            }
+        }
+
+        if (!(doseProbabilityNorm > 0.0)) {
+            continue;
+        }
+
+        std::vector<G4double> doseDensity(yCenters.size(), 0.0);
+        G4double inverseYF = 0.0;
+
+        for (size_t i = 0; i < yCenters.size(); ++i) {
+            const G4double y = yCenters[i];
+            const G4double yd = ydSpectrum[i] / doseProbabilityNorm;
+
+            if (!(y > 0.0) || !std::isfinite(yd) || yd < 0.0) {
+                continue;
+            }
+
+            doseDensity[i] = yd / y;
+            inverseYF += normalizationFactor * yd / y;
+        }
+
+        if (!(inverseYF > 0.0)) {
+            continue;
+        }
+
+        const G4double yF = 1.0 / inverseYF;
+        std::vector<G4double> frequencyDensity(yCenters.size(), 0.0);
+
+        for (size_t i = 0; i < yCenters.size(); ++i) {
+            const G4double y = yCenters[i];
+            if (y > 0.0) {
+                frequencyDensity[i] = doseDensity[i] * yF / y;
+            }
+        }
+
+        G4double frequencySem = std::numeric_limits<G4double>::quiet_NaN();
+        auto frequencyStatsIt = frequencyMeanStats.find(binIndex);
+        if (frequencyStatsIt != frequencyMeanStats.end()) {
+            frequencySem = frequencyStatsIt->second.StandardError();
+        }
+
+        G4double doseSem = std::numeric_limits<G4double>::quiet_NaN();
+        auto doseStatsIt = doseMeanStats.find(binIndex);
+        if (doseStatsIt != doseMeanStats.end()) {
+            doseSem = doseStatsIt->second.StandardError();
+        }
+
+        SpectrumMomentSummary summary;
+        summary.frequency = ComputeDistributionMoments(
+            yCenters,
+            frequencyDensity,
+            "frequency",
+            frequencySem);
+        summary.dose = ComputeDistributionMoments(
+            yCenters,
+            doseDensity,
+            "dose",
+            doseSem);
+        spectrumMomentSummaries[binIndex] = summary;
     }
 }
 
@@ -261,6 +593,12 @@ G4bool ScoreAMFSpectra::ProcessHits(G4Step* aStep, G4TouchableHistory*) {
     G4double dose = edep / (density * fSolid->GetCubicVolume());
     G4int binIndex = GetIndex(aStep);
 
+    const G4int eventId = GetCurrentEventId();
+    if (eventId != currentEventId) {
+        FlushCurrentEventMoments();
+        currentEventId = eventId;
+    }
+
     double dEdx = CalculateStoppingPower(
         aStep,
         particleDef,
@@ -281,6 +619,7 @@ G4bool ScoreAMFSpectra::ProcessHits(G4Step* aStep, G4TouchableHistory*) {
     }
 
     cumulativeDose[binIndex] += dose;
+    AccumulateCurrentEventMoments(binIndex, dose, microdosimetricSpectra);
 
     return true;
 }
@@ -642,6 +981,8 @@ void ScoreAMFSpectra::AbsorbResultsFromWorkerScorer(TsVScorer* workerScorer) {
         return;
     }
 
+    worker->FlushCurrentEventMoments();
+
     for (const auto& workerPair : worker->totalSpectra) {
         G4int binIndex = workerPair.first;
         const std::vector<G4double>& workerSpectra = workerPair.second;
@@ -667,9 +1008,19 @@ void ScoreAMFSpectra::AbsorbResultsFromWorkerScorer(TsVScorer* workerScorer) {
         }
         cumulativeDose[binIndex] += workerDose;
     }
+
+    for (const auto& workerPair : worker->frequencyMeanStats) {
+        frequencyMeanStats[workerPair.first].Absorb(workerPair.second);
+    }
+
+    for (const auto& workerPair : worker->doseMeanStats) {
+        doseMeanStats[workerPair.first].Absorb(workerPair.second);
+    }
 }
 
 void ScoreAMFSpectra::UserHookForEndOfRun() {
+    FlushCurrentEventMoments();
+
     for (auto& binSpectraPair : totalSpectra) {
         G4int binIndex = binSpectraPair.first;
         G4double binDose = cumulativeDose[binIndex];
@@ -684,7 +1035,9 @@ void ScoreAMFSpectra::UserHookForEndOfRun() {
         G4double binDose = dosePair.second;
         G4cout << "Bin Index " << binIndex << ": " << binDose << " Gy" << G4endl;
     }
+    ComputeFinalSpectrumMoments();
     OutputFinalSpectra();
+    OutputFinalSpectrumMoments();
 }
 
 void ScoreAMFSpectra::OutputFinalSpectra() {
@@ -731,4 +1084,51 @@ void ScoreAMFSpectra::OutputFinalSpectra() {
 
     fclose(out_file);
     G4cout << "Microdosimetric spectra output written to " << out_file_fn << G4endl;
+}
+
+void ScoreAMFSpectra::OutputFinalSpectrumMoments() {
+    G4String out_file_fn =
+        fPm->GetStringParameter(GetFullParmName("OutputFile")) +
+        "_MicrodosimetricMoments.csv";
+    FILE* out_file = fopen(out_file_fn.c_str(), "w");
+
+    if (!out_file) {
+        std::cerr << "Failed to open AMF spectrum moments output file" << std::endl;
+        return;
+    }
+
+    fprintf(
+        out_file,
+        "x,y,z,distribution,mean_keV_per_um,variance_keV2_per_um2,"
+        "stdev_keV_per_um,mean_standard_error_keV_per_um,skewness\n");
+
+    const auto writeMomentRow =
+        [this, out_file](G4int binIndex, const SpectrumDistributionMoment& moments) {
+            G4int ix = GetBin(binIndex, 0);
+            G4int iy = GetBin(binIndex, 1);
+            G4int iz = GetBin(binIndex, 2);
+
+            fprintf(
+                out_file,
+                "%d,%d,%d,%s,%.10e,%.10e,%.10e,%.10e,%.10e\n",
+                ix,
+                iy,
+                iz,
+                moments.distribution.c_str(),
+                moments.meanKeVPerUm,
+                moments.varianceKeV2PerUm2,
+                moments.stdevKeVPerUm,
+                moments.meanStandardErrorKeVPerUm,
+                moments.skewness);
+        };
+
+    for (const auto& summaryPair : spectrumMomentSummaries) {
+        const G4int binIndex = summaryPair.first;
+        const SpectrumMomentSummary& summary = summaryPair.second;
+        writeMomentRow(binIndex, summary.frequency);
+        writeMomentRow(binIndex, summary.dose);
+    }
+
+    fclose(out_file);
+    G4cout << "Microdosimetric moments output written to " << out_file_fn << G4endl;
 }

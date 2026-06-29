@@ -26,6 +26,7 @@
 #include <utility>
 #include <string>
 #include <cmath>
+#include <cstddef>
 
 class LookupEntryAMFSpectra {
 public:
@@ -53,6 +54,7 @@ public:
     void AbsorbResultsFromWorkerScorer(TsVScorer* workerScorer) override;
     void UserHookForEndOfRun();
     void OutputFinalSpectra();
+    void OutputFinalSpectrumMoments();
 
     double InterpolateStoppingPower(double izz, double ene);
 
@@ -95,6 +97,47 @@ private:
     std::map<G4int, std::vector<G4double>> totalSpectra;
     std::map<G4int, G4double> cumulativeDose;
 
+    struct EventMomentContribution {
+        G4double yDWeightedNumerator{0.0};
+        G4double doseDenominator{0.0};
+        G4double yFWeightedNumerator{0.0};
+        G4double yFWeightedDenominator{0.0};
+    };
+
+    struct RatioMomentAccumulator {
+        std::size_t count{0};
+        G4double numeratorSum{0.0};
+        G4double denominatorSum{0.0};
+        G4double numeratorSquaredSum{0.0};
+        G4double denominatorSquaredSum{0.0};
+        G4double numeratorDenominatorSum{0.0};
+
+        void AddSample(G4double numerator, G4double denominator);
+        void Absorb(const RatioMomentAccumulator& other);
+        G4double Mean() const;
+        G4double StandardError() const;
+    };
+
+    struct SpectrumDistributionMoment {
+        std::string distribution;
+        G4double meanKeVPerUm{0.0};
+        G4double varianceKeV2PerUm2{0.0};
+        G4double stdevKeVPerUm{0.0};
+        G4double meanStandardErrorKeVPerUm{0.0};
+        G4double skewness{0.0};
+    };
+
+    struct SpectrumMomentSummary {
+        SpectrumDistributionMoment frequency;
+        SpectrumDistributionMoment dose;
+    };
+
+    G4int currentEventId{-1};
+    std::map<G4int, EventMomentContribution> currentEventMoments;
+    std::map<G4int, RatioMomentAccumulator> frequencyMeanStats;
+    std::map<G4int, RatioMomentAccumulator> doseMeanStats;
+    std::map<G4int, SpectrumMomentSummary> spectrumMomentSummaries;
+
     const std::vector<double> eincion = {
         1.0, 2.0, 3.0, 5.0, 7.0, 10.0,
         20.0, 30.0, 50.0, 100.0, 300.0, 999.0
@@ -118,6 +161,18 @@ private:
     void LoadLookupTable(const std::string& filename);
     void loadIonData();
     void initializeYGrid();
+    G4int GetCurrentEventId() const;
+    void FlushCurrentEventMoments();
+    void AccumulateCurrentEventMoments(
+        G4int binIndex,
+        G4double dose,
+        const std::vector<std::pair<double, double>>& microdosimetricSpectra);
+    void ComputeFinalSpectrumMoments();
+    SpectrumDistributionMoment ComputeDistributionMoments(
+        const std::vector<G4double>& yCenters,
+        const std::vector<G4double>& densityValues,
+        const std::string& distribution,
+        G4double meanStandardError) const;
 
     G4double GetStepKineticEnergy(G4Step* aStep);
 

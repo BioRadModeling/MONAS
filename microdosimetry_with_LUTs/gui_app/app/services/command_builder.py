@@ -222,6 +222,7 @@ def _planned_amf_output_files(state: AppState) -> list[Path]:
     ]
     if state.amf_quantity == "AMFSpectra":
         files.append(run_dir / f"{output_stem}_MicrodosimetricSpectra.csv")
+        files.append(run_dir / f"{output_stem}_MicrodosimetricMoments.csv")
     else:
         files.append(run_dir / f"{output_stem}.csv")
     if state.amf_stopping_power == "ExternalTable":

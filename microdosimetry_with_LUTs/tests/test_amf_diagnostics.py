@@ -5,6 +5,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+CSV_WRITER_CPP = ROOT / "src" / "CsvWriter.cpp"
+AMF_RESULT_PARSER_CPP = ROOT / "src" / "AmfResultParser.cpp"
+AMF_SPECTRA_SCORER_CC = ROOT / "amf_extension" / "ScoreAMFSpectra.cc"
 
 AMF_SPECTRA = (
     ROOT
@@ -68,8 +71,58 @@ def integrated_yd_mean(y_values, yd_values, low=0.0, high=math.inf):
     return numerator, probability
 
 
+def ratio_standard_error(samples):
+    numerator_sum = sum(n for n, _ in samples)
+    denominator_sum = sum(d for _, d in samples)
+    ratio = numerator_sum / denominator_sum
+    residual_sum = sum((n - ratio * d) ** 2 for n, d in samples)
+    return math.sqrt(
+        len(samples)
+        / (len(samples) - 1)
+        * residual_sum
+        / denominator_sum**2
+    )
+
+
 class AmfDiagnosticsTest(unittest.TestCase):
+    def test_ratio_standard_error_formula_matches_manual_calculation(self):
+        samples = [(10.0, 2.0), (12.0, 3.0), (28.0, 4.0)]
+        numerator_sum = sum(n for n, _ in samples)
+        denominator_sum = sum(d for _, d in samples)
+        ratio = numerator_sum / denominator_sum
+
+        self.assertAlmostEqual(ratio, 50.0 / 9.0)
+        self.assertAlmostEqual(
+            ratio_standard_error(samples),
+            math.sqrt(
+                3.0
+                / 2.0
+                * sum((n - ratio * d) ** 2 for n, d in samples)
+                / denominator_sum**2
+            ),
+        )
+
+    def test_poly_spectrum_moments_schema_includes_standard_error(self):
+        writer_source = CSV_WRITER_CPP.read_text(encoding="utf-8")
+        self.assertIn("mean_standard_error_keV_per_um", writer_source)
+
+    def test_amf_spectra_moments_output_is_wired(self):
+        parser_source = AMF_RESULT_PARSER_CPP.read_text(encoding="utf-8")
+        scorer_source = AMF_SPECTRA_SCORER_CC.read_text(encoding="utf-8")
+
+        self.assertIn("_MicrodosimetricMoments.csv", parser_source)
+        self.assertIn("_MicrodosimetricMoments.csv", scorer_source)
+        self.assertIn("mean_standard_error_keV_per_um", scorer_source)
+
+    def test_amf_status_printer_reports_moments_csv(self):
+        main_source = (ROOT / "src" / "main.cpp").read_text(encoding="utf-8")
+
+        self.assertIn("Expected spectra moments CSV:", main_source)
+
     def test_lut_poly_spectrum_recomputes_reported_dose_mean(self):
+        if not LUT_SPECTRUM.exists() or not LUT_MOMENTS.exists():
+            self.skipTest("Missing LUT spectrum fixtures")
+
         rows = read_csv_rows(LUT_SPECTRUM)
         header = rows[0]
         y_index = header.index("y_keV_per_um")
@@ -92,6 +145,9 @@ class AmfDiagnosticsTest(unittest.TestCase):
         self.assertAlmostEqual(mean, moments["dose"], places=4)
 
     def test_amf_direct_yd_matches_amf_spectrum_integral(self):
+        if not AMF_SPECTRA.exists() or not AMF_YD.exists():
+            self.skipTest("Missing AMF spectra/direct yD fixtures")
+
         y_values = amf_y_grid()
         yd_values = read_amf_spectrum_values()
 
@@ -102,6 +158,9 @@ class AmfDiagnosticsTest(unittest.TestCase):
         self.assertLess(abs(mean - direct_yd) / direct_yd, 0.01)
 
     def test_amf_lut_difference_is_dominated_by_high_y_tail(self):
+        if not AMF_SPECTRA.exists() or not LUT_MOMENTS.exists():
+            self.skipTest("Missing AMF or LUT moments fixtures")
+
         y_values = amf_y_grid()
         yd_values = read_amf_spectrum_values()
         full_mean, _ = integrated_yd_mean(y_values, yd_values)
@@ -122,6 +181,9 @@ class AmfDiagnosticsTest(unittest.TestCase):
         self.assertGreater(above_100_mean / full_mean, 0.70)
 
     def test_saved_amf_spectra_header_contains_nonzero_y_centers(self):
+        if not AMF_SPECTRA.exists():
+            self.skipTest(f"Missing fixture: {AMF_SPECTRA}")
+
         rows = read_csv_rows(AMF_SPECTRA)
         y_headers = [float(value) for value in rows[0][3:]]
         self.assertEqual(len(y_headers), 400)

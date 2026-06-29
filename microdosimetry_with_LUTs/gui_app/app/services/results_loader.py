@@ -92,6 +92,11 @@ class ResultsLoader:
                 output_stem,
                 allow_name_fallback,
             )
+            moments_path = self._resolve_amf_spectrum_moments_file(
+                output_dir,
+                output_stem,
+                allow_name_fallback,
+            )
             loaded.spectrum_file = spectrum_path if spectrum_path.exists() else None
             loaded.spectrum_summary_text, loaded.spectrum_points = self._load_amf_spectrum(spectrum_path)
             loaded.preferred_file = spectrum_path if spectrum_path.exists() else None
@@ -99,6 +104,7 @@ class ResultsLoader:
                 ("Quantity", state.amf_quantity),
                 ("Domain radius [um]", f"{state.amf_domain_radius_um:g}"),
                 ("Spectrum file", str(spectrum_path) if spectrum_path.exists() else "Not found"),
+                ("Moments file", str(moments_path) if moments_path.exists() else "Not found"),
             ]
             return
 
@@ -137,6 +143,25 @@ class ResultsLoader:
             return named
 
         matches = sorted(output_dir.glob("*MicrodosimetricSpectra.csv"))
+        if matches:
+            return matches[0]
+        return exact
+
+    def _resolve_amf_spectrum_moments_file(
+        self,
+        output_dir: Path,
+        output_stem: str,
+        allow_name_fallback: bool,
+    ) -> Path:
+        exact = output_dir / f"{output_stem}_MicrodosimetricMoments.csv"
+        if exact.exists() or not allow_name_fallback:
+            return exact
+
+        named = output_dir / "AMF_Spectra_MicrodosimetricMoments.csv"
+        if named.exists():
+            return named
+
+        matches = sorted(output_dir.glob("*MicrodosimetricMoments.csv"))
         if matches:
             return matches[0]
         return exact

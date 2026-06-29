@@ -11,10 +11,6 @@
 
 namespace {
 
-bool isFinitePositive(double x) {
-    return std::isfinite(x) && x > 0.0;
-}
-
 void validateSpectrumShape(const PolySpectrum& spectrum) {
     const std::size_t nBins = spectrum.y.size();
     if (nBins < 2) {
@@ -26,85 +22,6 @@ void validateSpectrumShape(const PolySpectrum& spectrum) {
         throw std::runtime_error(
             "PolySpectrum vectors must all have the same size.");
     }
-}
-
-SpectrumDistributionMoments computeDistributionMoments(
-    const std::vector<double>& yValues,
-    const std::vector<double>& densityValues,
-    const std::string& distribution,
-    double normalizationFactor) {
-
-    if (yValues.size() != densityValues.size()) {
-        throw std::runtime_error(
-            "Cannot compute distribution moments with mismatched vector sizes.");
-    }
-
-    SpectrumDistributionMoments moments;
-    moments.distribution = distribution;
-
-    double totalProbability = 0.0;
-    for (std::size_t i = 0; i < yValues.size(); ++i) {
-        const double y = yValues[i];
-        const double density = densityValues[i];
-
-        if (!isFinitePositive(y)) {
-            throw std::runtime_error(
-                "Cannot compute distribution moments with a non-positive y value.");
-        }
-        if (!std::isfinite(density) || density < 0.0) {
-            throw std::runtime_error(
-                "Cannot compute distribution moments with an invalid density value.");
-        }
-
-        totalProbability += normalizationFactor * y * density;
-    }
-
-    if (!(totalProbability > 0.0)) {
-        throw std::runtime_error(
-            "Cannot compute distribution moments with non-positive total probability.");
-    }
-
-    double meanNumerator = 0.0;
-    for (std::size_t i = 0; i < yValues.size(); ++i) {
-        const double probability = normalizationFactor * yValues[i] * densityValues[i];
-        meanNumerator += probability * yValues[i];
-    }
-    moments.meanKeVPerUm = meanNumerator / totalProbability;
-
-    double varianceNumerator = 0.0;
-    for (std::size_t i = 0; i < yValues.size(); ++i) {
-        const double probability = normalizationFactor * yValues[i] * densityValues[i];
-        const double delta = yValues[i] - moments.meanKeVPerUm;
-        varianceNumerator += probability * delta * delta;
-    }
-
-    moments.varianceKeV2PerUm2 = varianceNumerator / totalProbability;
-    if (moments.varianceKeV2PerUm2 < 0.0 &&
-        std::abs(moments.varianceKeV2PerUm2) < 1.0e-12) {
-        moments.varianceKeV2PerUm2 = 0.0;
-    }
-    if (moments.varianceKeV2PerUm2 < 0.0) {
-        throw std::runtime_error(
-            "Cannot compute distribution moments with a negative variance.");
-    }
-
-    moments.stdevKeVPerUm = std::sqrt(moments.varianceKeV2PerUm2);
-
-    if (moments.stdevKeVPerUm == 0.0) {
-        moments.skewness = 0.0;
-        return moments;
-    }
-
-    double skewnessNumerator = 0.0;
-    for (std::size_t i = 0; i < yValues.size(); ++i) {
-        const double probability = normalizationFactor * yValues[i] * densityValues[i];
-        const double standardized =
-            (yValues[i] - moments.meanKeVPerUm) / moments.stdevKeVPerUm;
-        skewnessNumerator += probability * standardized * standardized * standardized;
-    }
-
-    moments.skewness = skewnessNumerator / totalProbability;
-    return moments;
 }
 
 }  // namespace
@@ -581,12 +498,32 @@ void SpectrumAccumulator::addInterpolatedContribution(
     const auto& lowerRawFy = precomputedRawFyByTable_[lowerTableIndex];
     const auto& upperRawFy = precomputedRawFyByTable_[upperTableIndex];
 
+    const double C = logarithmicBinNormalizationFactor();
+    double moment0 = 0.0;
+    double moment1 = 0.0;
+    double moment2 = 0.0;
+
     for (std::size_t i = 0; i < lowerRawFy.size(); ++i) {
         const double interpolatedRawFy =
             lowerWeight * lowerRawFy[i] + upperWeight * upperRawFy[i];
         numerator_[i] += multiplicity * interpolatedRawFy;
+
+        const double y = yCenters_[i];
+        const double momentWeight = C * y * interpolatedRawFy;
+        moment0 += momentWeight;
+        moment1 += momentWeight * y;
+        moment2 += momentWeight * y * y;
     }
     denominator_ += multiplicity;
+
+    if (moment0 > 0.0 && moment1 > 0.0) {
+        frequencyMeanError_.addSample(
+            multiplicity * moment1,
+            multiplicity * moment0);
+        doseMeanError_.addSample(
+            multiplicity * moment2,
+            multiplicity * moment1);
+    }
 }
 
 PolySpectrum SpectrumAccumulator::finalize() const {
@@ -654,24 +591,17 @@ PolySpectrumMomentsSummary SpectrumAccumulator::summarizeMoments(
     const double normalizationFactor = logarithmicBinNormalizationFactor();
 
     PolySpectrumMomentsSummary summary;
-    summary.frequency = computeDistributionMoments(
+    summary.frequency = computeSpectrumDistributionMoments(
         spectrum.y, spectrum.f, "frequency", normalizationFactor);
-    summary.dose = computeDistributionMoments(
+    summary.dose = computeSpectrumDistributionMoments(
         spectrum.y, spectrum.d, "dose", normalizationFactor);
+    summary.frequency.meanStandardErrorKeVPerUm =
+        frequencyMeanError_.standardError();
+    summary.dose.meanStandardErrorKeVPerUm =
+        doseMeanError_.standardError();
     return summary;
 }
 
 double SpectrumAccumulator::logarithmicBinNormalizationFactor() const {
-    if (yCenters_.size() < 2) {
-        throw std::runtime_error("Insufficient rebinned y-grid size.");
-    }
-
-    const double deltaLogY = std::log10(yCenters_[1]) - std::log10(yCenters_[0]);
-    const double normalizationFactor = std::log(10.0) * deltaLogY;
-
-    if (!(normalizationFactor > 0.0)) {
-        throw std::runtime_error("Invalid logarithmic-bin normalization factor C.");
-    }
-
-    return normalizationFactor;
+    return logarithmicBinNormalizationFactorForCenters(yCenters_);
 }

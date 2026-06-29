@@ -9,6 +9,7 @@
 struct AmfResultFiles {
     std::filesystem::path scorerOutputFile;
     std::optional<std::filesystem::path> spectraCsvFile;
+    std::optional<std::filesystem::path> spectraMomentsCsvFile;
 };
 
 class AmfResultParser {

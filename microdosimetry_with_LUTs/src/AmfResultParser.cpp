@@ -18,6 +18,12 @@ fs::path spectraOutputPath(const AmfConfig& config,
            (config.outputFile + "_MicrodosimetricSpectra.csv");
 }
 
+fs::path spectraMomentsOutputPath(const AmfConfig& config,
+                                  const AmfStagedRun& stagedRun) {
+    return stagedRun.runDirectory /
+           (config.outputFile + "_MicrodosimetricMoments.csv");
+}
+
 }  // namespace
 
 AmfResultFiles AmfResultParser::expectedResultFiles(
@@ -29,6 +35,7 @@ AmfResultFiles AmfResultParser::expectedResultFiles(
 
     if (config.quantity == AmfQuantity::Spectra) {
         files.spectraCsvFile = spectraOutputPath(config, stagedRun);
+        files.spectraMomentsCsvFile = spectraMomentsOutputPath(config, stagedRun);
     }
 
     return files;
@@ -44,6 +51,11 @@ bool AmfResultParser::hasExpectedResults(const AmfConfig& config,
 
     if (files.spectraCsvFile.has_value() &&
         !fs::exists(*files.spectraCsvFile)) {
+        return false;
+    }
+
+    if (files.spectraMomentsCsvFile.has_value() &&
+        !fs::exists(*files.spectraMomentsCsvFile)) {
         return false;
     }
 
