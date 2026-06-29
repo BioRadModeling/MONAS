@@ -33,6 +33,19 @@ struct Vec3 {
     double z{0.0};
 };
 
+struct Mat3 {
+    double m[3][3]{
+        {1.0, 0.0, 0.0},
+        {0.0, 1.0, 0.0},
+        {0.0, 0.0, 1.0}
+    };
+};
+
+struct Transform {
+    Mat3 rotation;
+    Vec3 translation;
+};
+
 std::string trim(const std::string& value) {
     const std::size_t begin = value.find_first_not_of(" \t\r\n");
     if (begin == std::string::npos) {
@@ -109,6 +122,62 @@ std::vector<std::string> splitTokens(const std::string& value) {
         tokens.push_back(token);
     }
     return tokens;
+}
+
+Vec3 apply(const Mat3& matrix, const Vec3& vector) {
+    return Vec3{
+        matrix.m[0][0] * vector.x +
+            matrix.m[0][1] * vector.y +
+            matrix.m[0][2] * vector.z,
+        matrix.m[1][0] * vector.x +
+            matrix.m[1][1] * vector.y +
+            matrix.m[1][2] * vector.z,
+        matrix.m[2][0] * vector.x +
+            matrix.m[2][1] * vector.y +
+            matrix.m[2][2] * vector.z
+    };
+}
+
+Vec3 add(const Vec3& a, const Vec3& b) {
+    return Vec3{a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+Mat3 multiply(const Mat3& a, const Mat3& b) {
+    Mat3 result{};
+    for (int row = 0; row < 3; ++row) {
+        for (int col = 0; col < 3; ++col) {
+            result.m[row][col] = 0.0;
+            for (int inner = 0; inner < 3; ++inner) {
+                result.m[row][col] += a.m[row][inner] * b.m[inner][col];
+            }
+        }
+    }
+    return result;
+}
+
+double degreesToRadians(double degrees) {
+    return degrees * std::acos(-1.0) / 180.0;
+}
+
+Mat3 rotationX(double degrees) {
+    const double radians = degreesToRadians(degrees);
+    const double c = std::cos(radians);
+    const double s = std::sin(radians);
+    return Mat3{{{1.0, 0.0, 0.0}, {0.0, c, -s}, {0.0, s, c}}};
+}
+
+Mat3 rotationY(double degrees) {
+    const double radians = degreesToRadians(degrees);
+    const double c = std::cos(radians);
+    const double s = std::sin(radians);
+    return Mat3{{{c, 0.0, s}, {0.0, 1.0, 0.0}, {-s, 0.0, c}}};
+}
+
+Mat3 rotationZ(double degrees) {
+    const double radians = degreesToRadians(degrees);
+    const double c = std::cos(radians);
+    const double s = std::sin(radians);
+    return Mat3{{{c, -s, 0.0}, {s, c, 0.0}, {0.0, 0.0, 1.0}}};
 }
 
 class TopasParameterFile {
@@ -362,36 +431,68 @@ double optionalLengthMm(TopasParameterFile& topas,
     return topas.lengthMm(key);
 }
 
-void failOnNonZeroRotation(TopasParameterFile& topas,
-                           const std::vector<std::string>& chain) {
-    for (const std::string& component : chain) {
-        for (const char axis : {'X', 'Y', 'Z'}) {
-            const std::string key = "Ge/" + component + "/Rot" + axis;
-            if (!topas.has(key)) {
-                continue;
-            }
-            const std::vector<std::string> tokens =
-                splitTokens(topas.optionalStringValue(key, "0 deg"));
-            const double rotation = tokens.empty() ? 0.0 : std::stod(tokens.front());
-            if (std::abs(rotation) > 1e-9) {
-                throw std::runtime_error(
-                    "AMF replay geometry derivation does not support non-zero "
-                    "rotations in the scoring ancestry: " +
-                    key);
-            }
-        }
+double optionalRotationDegrees(TopasParameterFile& topas,
+                               const std::string& key) {
+    const std::vector<std::string> tokens =
+        splitTokens(topas.optionalStringValue(key, "0 deg"));
+    if (tokens.empty()) {
+        return 0.0;
     }
+    if (!isNumber(tokens.front())) {
+        throw std::runtime_error("Unsupported TOPAS rotation value: " + key);
+    }
+    if (tokens.size() > 1 && tokens[1] != "deg") {
+        throw std::runtime_error(
+            "Unsupported TOPAS rotation unit for " + key +
+            ". Only degrees are supported.");
+    }
+    return std::stod(tokens.front());
 }
 
-Vec3 worldTranslationMm(TopasParameterFile& topas,
-                        const std::vector<std::string>& chain) {
-    Vec3 translation;
+Mat3 localRotation(TopasParameterFile& topas, const std::string& component) {
+    const double rotX =
+        optionalRotationDegrees(topas, "Ge/" + component + "/RotX");
+    const double rotY =
+        optionalRotationDegrees(topas, "Ge/" + component + "/RotY");
+    const double rotZ =
+        optionalRotationDegrees(topas, "Ge/" + component + "/RotZ");
+    return multiply(rotationZ(rotZ), multiply(rotationY(rotY), rotationX(rotX)));
+}
+
+Vec3 localTranslationMm(TopasParameterFile& topas,
+                        const std::string& component) {
+    return Vec3{
+        optionalLengthMm(topas, "Ge/" + component + "/TransX", 0.0),
+        optionalLengthMm(topas, "Ge/" + component + "/TransY", 0.0),
+        optionalLengthMm(topas, "Ge/" + component + "/TransZ", 0.0)
+    };
+}
+
+Transform worldTransform(TopasParameterFile& topas,
+                         std::vector<std::string> chain) {
+    std::reverse(chain.begin(), chain.end());
+
+    Transform transform;
     for (const std::string& component : chain) {
-        translation.x += optionalLengthMm(topas, "Ge/" + component + "/TransX", 0.0);
-        translation.y += optionalLengthMm(topas, "Ge/" + component + "/TransY", 0.0);
-        translation.z += optionalLengthMm(topas, "Ge/" + component + "/TransZ", 0.0);
+        const Vec3 localTranslation = localTranslationMm(topas, component);
+        const Mat3 rotation = localRotation(topas, component);
+        transform.translation =
+            add(apply(transform.rotation, localTranslation),
+                transform.translation);
+        transform.rotation = multiply(transform.rotation, rotation);
     }
-    return translation;
+    return transform;
+}
+
+std::string componentNameFromSurface(const std::string& surface) {
+    const std::size_t slash = surface.find('/');
+    if (slash == std::string::npos || slash == 0) {
+        throw std::runtime_error(
+            "Phase-space scorer is missing Component, and Surface does not "
+            "include a component name: " +
+            surface);
+    }
+    return surface.substr(0, slash);
 }
 
 std::string findPhaseSpaceScorer(TopasParameterFile& topas) {
@@ -427,7 +528,16 @@ std::string findWaterPhantom(TopasParameterFile& topas,
         "No G4_WATER ancestor found for the phase-space scoring component.");
 }
 
-void validatePhaseSpaceBounds(const AmfConfig& config, const Bounds& bounds) {
+bool isCurvedSphereSurface(TopasParameterFile& topas,
+                           const AmfConfig& config) {
+    const std::string componentType =
+        topas.optionalStringValue("Ge/" + config.phaseSpaceComponent + "/Type", "");
+    return componentType == "TsSphere" &&
+           config.phaseSpaceSurface.find("CurvedSurface") != std::string::npos;
+}
+
+void validatePlanarPhaseSpaceBounds(const AmfConfig& config,
+                                    const Bounds& bounds) {
     const double midX = (bounds.minX + bounds.maxX) / 2.0;
     const double midY = (bounds.minY + bounds.maxY) / 2.0;
     const double midZ = (bounds.minZ + bounds.maxZ) / 2.0;
@@ -449,6 +559,42 @@ void validatePhaseSpaceBounds(const AmfConfig& config, const Bounds& bounds) {
     check("Z", config.scoringTransZmm, midZ);
 }
 
+void validateCurvedSpherePhaseSpaceBounds(TopasParameterFile& topas,
+                                          const AmfConfig& config,
+                                          const Bounds& bounds) {
+    const double tolerance = config.geometryToleranceMm;
+
+    const auto checkContainsCenter = [&](const char* axis,
+                                         double center,
+                                         double minimum,
+                                         double maximum) {
+        if (center < minimum - tolerance || center > maximum + tolerance) {
+            std::ostringstream message;
+            message << "Geometry mismatch: phase-space " << axis
+                    << " bounds [" << minimum << ", " << maximum
+                    << "] mm do not contain the source TOPAS scorer center "
+                    << center << " mm for curved surface "
+                    << config.phaseSpaceSurface << ".";
+            throw std::runtime_error(message.str());
+        }
+    };
+
+    checkContainsCenter("X", config.scoringTransXmm, bounds.minX, bounds.maxX);
+    checkContainsCenter("Y", config.scoringTransYmm, bounds.minY, bounds.maxY);
+    checkContainsCenter("Z", config.scoringTransZmm, bounds.minZ, bounds.maxZ);
+}
+
+void validatePhaseSpaceBounds(TopasParameterFile& topas,
+                              const AmfConfig& config,
+                              const Bounds& bounds) {
+    if (isCurvedSphereSurface(topas, config)) {
+        validateCurvedSpherePhaseSpaceBounds(topas, config, bounds);
+        return;
+    }
+
+    validatePlanarPhaseSpaceBounds(config, bounds);
+}
+
 }  // namespace
 
 void AmfGeometryDeriver::deriveReplayGeometry(AmfConfig& config) {
@@ -464,15 +610,20 @@ void AmfGeometryDeriver::deriveReplayGeometry(AmfConfig& config) {
 
     const std::string scorerName = findPhaseSpaceScorer(topas);
     config.phaseSpaceScorerName = scorerName;
-    config.phaseSpaceComponent =
-        topas.stringValue("Sc/" + scorerName + "/Component");
     config.phaseSpaceSurface =
         topas.optionalStringValue("Sc/" + scorerName + "/Surface", "");
+    if (topas.has("Sc/" + scorerName + "/Component")) {
+        config.phaseSpaceComponent =
+            topas.stringValue("Sc/" + scorerName + "/Component");
+    } else {
+        config.phaseSpaceComponent =
+            componentNameFromSurface(config.phaseSpaceSurface);
+    }
 
     const std::vector<std::string> scoringChain =
         ancestorChain(topas, config.phaseSpaceComponent);
-    failOnNonZeroRotation(topas, scoringChain);
-    const Vec3 sourceCenter = worldTranslationMm(topas, scoringChain);
+    const Transform scoringTransform = worldTransform(topas, scoringChain);
+    const Vec3 sourceCenter = scoringTransform.translation;
 
     config.scoringComponent = "AMFScoringVolume";
     config.scoringMaterial = "G4_WATER";
@@ -483,8 +634,8 @@ void AmfGeometryDeriver::deriveReplayGeometry(AmfConfig& config) {
     const std::string phantomComponent = findWaterPhantom(topas, scoringChain);
     const std::vector<std::string> phantomChain =
         ancestorChain(topas, phantomComponent);
-    failOnNonZeroRotation(topas, phantomChain);
-    const Vec3 phantomCenter = worldTranslationMm(topas, phantomChain);
+    const Transform phantomTransform = worldTransform(topas, phantomChain);
+    const Vec3 phantomCenter = phantomTransform.translation;
 
     config.phantomComponent = phantomComponent;
     config.phantomMaterial = "G4_WATER";
@@ -508,5 +659,5 @@ void AmfGeometryDeriver::deriveReplayGeometry(AmfConfig& config) {
     config.phaseSpaceMinZmm = bounds.minZ;
     config.phaseSpaceMaxZmm = bounds.maxZ;
 
-    validatePhaseSpaceBounds(config, bounds);
+    validatePhaseSpaceBounds(topas, config, bounds);
 }

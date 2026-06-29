@@ -1,10 +1,13 @@
 import csv
 import math
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+BINARY = ROOT / "build" / "microdosimetry_with_LUTs"
 CSV_WRITER_CPP = ROOT / "src" / "CsvWriter.cpp"
 AMF_RESULT_PARSER_CPP = ROOT / "src" / "AmfResultParser.cpp"
 AMF_SPECTRA_SCORER_CC = ROOT / "amf_extension" / "ScoreAMFSpectra.cc"
@@ -118,6 +121,121 @@ class AmfDiagnosticsTest(unittest.TestCase):
         main_source = (ROOT / "src" / "main.cpp").read_text(encoding="utf-8")
 
         self.assertIn("Expected spectra moments CSV:", main_source)
+
+    def test_amf_stage_accepts_rotated_curved_surface_without_component(self):
+        if not BINARY.exists():
+            self.skipTest(f"Missing built executable: {BINARY}")
+        if not (ROOT / "lookup_tables" / "AMF" / "tsed.dat").exists():
+            self.skipTest("Missing AMF tsed.dat")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            source = temp / "source.txt"
+            phase_space_base = temp / "TEgasSV_EntranceHemisphere_PhaseSpace_15cm"
+            run_dir = temp / "staged"
+
+            source.write_text(
+                """
+s:Ge/World/Material = "Air"
+d:Ge/World/HLX = 5.0 m
+d:Ge/World/HLY = 5.0 m
+d:Ge/World/HLZ = 5.0 m
+s:Ge/Phantom/Type = "TsBox"
+s:Ge/Phantom/Parent = "World"
+s:Ge/Phantom/Material = "G4_WATER"
+d:Ge/Phantom/HLX = 7.0 cm
+d:Ge/Phantom/HLY = 7.0 cm
+d:Ge/Phantom/HLZ = 15.0 cm
+d:Ge/Phantom/TransX = 0. cm
+d:Ge/Phantom/TransY = 0. cm
+d:Ge/Phantom/TransZ = -16. cm
+d:Ge/Phantom/RotX = 180. deg
+d:Ge/Phantom/RotY = 0. deg
+d:Ge/Phantom/RotZ = 0. deg
+s:Ge/AlShellOut/Parent = "Phantom"
+s:Ge/AlShellOut/Type = "TsSphere"
+s:Ge/AlShellOut/Material = "Aluminum"
+d:Ge/AlShellOut/RMin = 0. mm
+d:Ge/AlShellOut/RMax = 10.0 mm
+d:Ge/AlShellOut/TransX = 0. mm
+d:Ge/AlShellOut/TransY = 0. mm
+d:Ge/AlShellOut/TransZ = -115.0 mm
+s:Ge/AlShellIn/Parent = "AlShellOut"
+s:Ge/AlShellIn/Type = "TsSphere"
+s:Ge/AlShellIn/Material = "TEgas"
+d:Ge/AlShellIn/RMin = 0. mm
+d:Ge/AlShellIn/RMax = 9.82 mm
+s:Ge/A150/Parent = "AlShellIn"
+s:Ge/A150/Type = "TsSphere"
+s:Ge/A150/Material = "G4_A-150_TISSUE"
+d:Ge/A150/RMin = 0. mm
+d:Ge/A150/RMax = 7.62 mm
+s:Ge/TEgasSV/Parent = "A150"
+s:Ge/TEgasSV/Type = "TsSphere"
+s:Ge/TEgasSV/Material = "TEgas"
+d:Ge/TEgasSV/RMin = 0. mm
+d:Ge/TEgasSV/RMax = 6.35 mm
+s:Sc/TEgasSVEntrancePS/Quantity = "PhaseSpace"
+s:Sc/TEgasSVEntrancePS/Surface = "TEgasSV/OuterCurvedSurface"
+s:Sc/TEgasSVEntrancePS/OutputType = "ASCII"
+s:Sc/TEgasSVEntrancePS/OutputFile = "TEgasSV_EntranceHemisphere_PhaseSpace"
+""".lstrip(),
+                encoding="utf-8",
+            )
+            (phase_space_base.with_suffix(".header")).write_text(
+                "TOPAS ASCII Phase Space\n", encoding="utf-8"
+            )
+            (phase_space_base.with_suffix(".phsp")).write_text(
+                "\n".join(
+                    [
+                        "0.0 0.0 -4.49999 0 0 1 1 2212 0 1",
+                        "0.0 0.0 -3.86500 0 0 1 1 2212 0 1",
+                        "0.635 0.0 -4.2 0 0 1 1 2212 0 1",
+                        "-0.635 0.0 -4.2 0 0 1 1 2212 0 1",
+                        "0.0 0.635 -4.2 0 0 1 1 2212 0 1",
+                        "0.0 -0.635 -4.2 0 0 1 1 2212 0 1",
+                        "0.1 0.1 -4.2 0 0 0 1 11 0 0",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    str(BINARY),
+                    "AMF-stage",
+                    str(ROOT / "lookup_tables"),
+                    str(phase_space_base),
+                    str(source),
+                    str(run_dir),
+                    "AMFSpectra",
+                    "--scoring-radius-mm",
+                    "6.35",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(
+                result.returncode,
+                0,
+                msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+            )
+            manifest = (run_dir / "amf_run_manifest.txt").read_text(
+                encoding="utf-8"
+            )
+            replay = (run_dir / "replay_amf.txt").read_text(encoding="utf-8")
+            self.assertIn("phase_space_component = TEgasSV", manifest)
+            self.assertIn("phase_space_energy_floored_rows = 1", manifest)
+            self.assertIn("scoring_trans_z_mm = -45", manifest)
+            self.assertIn("d:Ge/Phantom/TransZ = -160", replay)
+            self.assertIn("d:Ge/AMFScoringVolume/TransZ = 115", replay)
+            staged_phase_space = (
+                run_dir / "TEgasSV_EntranceHemisphere_PhaseSpace_15cm.phsp"
+            ).read_text(encoding="utf-8")
+            self.assertIn("0.1 0.1 -4.2 0 0 1e-09 1 11 0 0", staged_phase_space)
 
     def test_lut_poly_spectrum_recomputes_reported_dose_mean(self):
         if not LUT_SPECTRUM.exists() or not LUT_MOMENTS.exists():

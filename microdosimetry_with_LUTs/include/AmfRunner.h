@@ -11,6 +11,7 @@ struct AmfStagedRun {
     std::filesystem::path stagedTsedPath;
     std::filesystem::path stagedPhaseSpacePath;
     std::filesystem::path stagedHeaderPath;
+    std::size_t phaseSpaceEnergyFlooredRows{0};
 };
 
 struct AmfRunResult {

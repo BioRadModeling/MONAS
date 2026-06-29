@@ -3,9 +3,11 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <sys/wait.h>
+#include <vector>
 
 #include "AmfTemplateWriter.h"
 
@@ -32,6 +34,10 @@ fs::path requireStagedRunDirectory(const AmfConfig& config) {
 struct PhaseSpacePair {
     fs::path phaseSpacePath;
     fs::path headerPath;
+};
+
+struct PhaseSpaceSanitization {
+    std::size_t energyFlooredRows{0};
 };
 
 PhaseSpacePair validatePhaseSpacePair(const fs::path& phaseSpaceBasePath) {
@@ -67,6 +73,8 @@ void writeManifest(const AmfConfig& config,
     out << "tsed_dat = " << stagedRun.stagedTsedPath << "\n";
     out << "phase_space = " << stagedRun.stagedPhaseSpacePath << "\n";
     out << "phase_space_header = " << stagedRun.stagedHeaderPath << "\n";
+    out << "phase_space_energy_floored_rows = "
+        << stagedRun.phaseSpaceEnergyFlooredRows << "\n";
     out << "source_topas_file = " << config.sourceTopasPath << "\n";
     out << "phase_space_scorer = " << config.phaseSpaceScorerName << "\n";
     out << "phase_space_component = " << config.phaseSpaceComponent << "\n";
@@ -162,6 +170,69 @@ void validateConfig(const AmfConfig& config) {
     }
 }
 
+bool parseTopasAsciiPhaseSpaceRow(const std::string& line,
+                                  std::vector<std::string>& columns,
+                                  double& kineticEnergyMev) {
+    columns.clear();
+    std::istringstream input(line);
+    std::string column;
+    while (input >> column) {
+        columns.push_back(column);
+    }
+
+    if (columns.size() < 10) {
+        return false;
+    }
+
+    try {
+        kineticEnergyMev = std::stod(columns[5]);
+    } catch (const std::exception&) {
+        return false;
+    }
+
+    return true;
+}
+
+PhaseSpaceSanitization copyPhaseSpaceForTopasReplay(const fs::path& source,
+                                                    const fs::path& destination) {
+    constexpr double kMinimumReplayKineticEnergyMev = 1.0e-9;
+
+    std::ifstream input(source);
+    if (!input) {
+        throw std::runtime_error("Failed to open AMF phase-space file: " +
+                                 source.string());
+    }
+
+    std::ofstream output(destination);
+    if (!output) {
+        throw std::runtime_error("Failed to open staged AMF phase-space file: " +
+                                 destination.string());
+    }
+
+    PhaseSpaceSanitization sanitization;
+    std::string line;
+    std::vector<std::string> columns;
+    while (std::getline(input, line)) {
+        double kineticEnergyMev = 0.0;
+        if (parseTopasAsciiPhaseSpaceRow(line, columns, kineticEnergyMev) &&
+            kineticEnergyMev <= 0.0) {
+            columns[5] = "1e-09";
+            for (std::size_t i = 0; i < columns.size(); ++i) {
+                if (i != 0) {
+                    output << ' ';
+                }
+                output << columns[i];
+            }
+            output << '\n';
+            ++sanitization.energyFlooredRows;
+        } else {
+            output << line << '\n';
+        }
+    }
+
+    return sanitization;
+}
+
 }  // namespace
 
 AmfStagedRun AmfRunner::stageRun(const AmfConfig& config) {
@@ -183,9 +254,9 @@ AmfStagedRun AmfRunner::stageRun(const AmfConfig& config) {
     fs::copy_file(config.tsedPath,
                   stagedTsedPath,
                   fs::copy_options::overwrite_existing);
-    fs::copy_file(phaseSpacePair.phaseSpacePath,
-                  stagedPhaseSpacePath,
-                  fs::copy_options::overwrite_existing);
+    const PhaseSpaceSanitization sanitization =
+        copyPhaseSpaceForTopasReplay(phaseSpacePair.phaseSpacePath,
+                                     stagedPhaseSpacePath);
     fs::copy_file(phaseSpacePair.headerPath,
                   stagedHeaderPath,
                   fs::copy_options::overwrite_existing);
@@ -198,7 +269,8 @@ AmfStagedRun AmfRunner::stageRun(const AmfConfig& config) {
         manifestFile,
         stagedTsedPath,
         stagedPhaseSpacePath,
-        stagedHeaderPath
+        stagedHeaderPath,
+        sanitization.energyFlooredRows
     };
 
     writeManifest(config, manifestFile, stagedRun);
