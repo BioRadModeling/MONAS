@@ -511,21 +511,32 @@ std::string findPhaseSpaceScorer(TopasParameterFile& topas) {
         "Quantity = \"PhaseSpace\".");
 }
 
-std::string findWaterPhantom(TopasParameterFile& topas,
-                             const std::vector<std::string>& chain) {
+bool hasBoxHalfLengths(TopasParameterFile& topas,
+                       const std::string& component) {
+    return topas.has("Ge/" + component + "/HLX") &&
+           topas.has("Ge/" + component + "/HLY") &&
+           topas.has("Ge/" + component + "/HLZ");
+}
+
+std::string findWaterBoxPhantom(TopasParameterFile& topas,
+                                const std::vector<std::string>& chain) {
     for (const std::string& component : chain) {
         if (component == "World") {
             continue;
         }
         const std::string material =
             topas.optionalStringValue("Ge/" + component + "/Material", "");
-        if (material == "G4_WATER") {
+        const std::string type =
+            topas.optionalStringValue("Ge/" + component + "/Type", "");
+        if (material == "G4_WATER" && type == "TsBox" &&
+            hasBoxHalfLengths(topas, component)) {
             return component;
         }
     }
 
     throw std::runtime_error(
-        "No G4_WATER ancestor found for the phase-space scoring component.");
+        "No G4_WATER TsBox ancestor with HLX/HLY/HLZ found for the "
+        "phase-space scoring component.");
 }
 
 bool isCurvedSphereSurface(TopasParameterFile& topas,
@@ -631,7 +642,7 @@ void AmfGeometryDeriver::deriveReplayGeometry(AmfConfig& config) {
     config.scoringTransYmm = sourceCenter.y;
     config.scoringTransZmm = sourceCenter.z;
 
-    const std::string phantomComponent = findWaterPhantom(topas, scoringChain);
+    const std::string phantomComponent = findWaterBoxPhantom(topas, scoringChain);
     const std::vector<std::string> phantomChain =
         ancestorChain(topas, phantomComponent);
     const Transform phantomTransform = worldTransform(topas, phantomChain);
