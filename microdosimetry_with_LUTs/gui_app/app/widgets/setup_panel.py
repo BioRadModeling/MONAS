@@ -346,10 +346,24 @@ class SetupPanel(QWidget):
         self.let_checkbox = QCheckBox("LET")
         self.magini_checkbox = QCheckBox("Magini")
         self.inaniwa_checkbox = QCheckBox("Inaniwa")
+        self.at_checkbox = QCheckBox("AT")
+        self.at_particle_combo = QComboBox()
+        self.at_particle_combo.addItems(["proton", "carbon"])
 
-        for widget in (self.let_checkbox, self.magini_checkbox, self.inaniwa_checkbox):
+        for widget in (
+            self.let_checkbox,
+            self.magini_checkbox,
+            self.inaniwa_checkbox,
+            self.at_checkbox,
+        ):
             widget.toggled.connect(self._sync_state_from_widgets)
             layout.addWidget(widget)
+
+        at_particle_row = QHBoxLayout()
+        at_particle_row.addWidget(QLabel("AT LUT"))
+        at_particle_row.addWidget(self.at_particle_combo)
+        layout.addLayout(at_particle_row)
+        self.at_particle_combo.currentIndexChanged.connect(self._sync_state_from_widgets)
 
         #note = QLabel(
         #    "Current modes reflect the repository's available mean-value-only LUTs "
@@ -508,6 +522,8 @@ class SetupPanel(QWidget):
         self.let_checkbox.setChecked(state.enable_let)
         self.magini_checkbox.setChecked(state.enable_magini)
         self.inaniwa_checkbox.setChecked(state.enable_inaniwa)
+        self.at_checkbox.setChecked(state.enable_at)
+        self.at_particle_combo.setCurrentText(state.at_particle)
 
         self.amf_quantity_combo.setCurrentText(state.amf_quantity)
         self._set_domain_radius_controls(state.amf_domain_radius_um)
@@ -548,6 +564,8 @@ class SetupPanel(QWidget):
         self._state.enable_let = self.let_checkbox.isChecked()
         self._state.enable_magini = self.magini_checkbox.isChecked()
         self._state.enable_inaniwa = self.inaniwa_checkbox.isChecked()
+        self._state.enable_at = self.at_checkbox.isChecked()
+        self._state.at_particle = self.at_particle_combo.currentText()
         self._state.amf_quantity = self.amf_quantity_combo.currentText()
         self._state.amf_domain_radius_um = self.amf_domain_radius_input.value()
         self._state.amf_stopping_power = self.amf_stopping_power_combo.currentText()
@@ -575,6 +593,7 @@ class SetupPanel(QWidget):
         external_selected = self._state.amf_stopping_power == "ExternalTable"
         self.amf_external_stopping_power_row.setVisible(external_selected)
         self.amf_external_stopping_power_label.setVisible(external_selected)
+        self.at_particle_combo.setEnabled(self._state.enable_at)
 
     def _update_command_preview(self) -> None:
         self.command_preview.setPlainText(render_command_preview(self._state))

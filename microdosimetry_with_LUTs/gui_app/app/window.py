@@ -114,6 +114,8 @@ class MainWindow(QMainWindow):
                 enabled.append("Magini")
             if state.enable_inaniwa:
                 enabled.append("Inaniwa")
+            if state.enable_at:
+                enabled.append(f"AT ({state.at_particle})")
             detail_lines.append(
                 "Enabled mean-value modes: " + (", ".join(enabled) if enabled else "none")
             )
@@ -227,6 +229,8 @@ class MainWindow(QMainWindow):
                 enabled.append("Magini")
             if state.enable_inaniwa:
                 enabled.append("Inaniwa")
+            if state.enable_at:
+                enabled.append(f"AT ({state.at_particle})")
             return "Mean values only: " + (", ".join(enabled) if enabled else "no summary mode selected")
 
         if state.approach == "amf":

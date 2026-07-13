@@ -81,6 +81,9 @@ class ResultsPanel(QWidget):
         self.inaniwa_table = self._build_key_value_table()
         self.tabs.addTab(self.inaniwa_table, "Inaniwa")
 
+        self.at_table = self._build_key_value_table()
+        self.tabs.addTab(self.at_table, "AT")
+
         self.tabs.addTab(self._build_files_tab(), "Files")
 
         self.run_log = QPlainTextEdit()
@@ -321,6 +324,7 @@ class ResultsPanel(QWidget):
         self._populate_table(self.let_table, loaded.let_headers, loaded.let_rows)
         self._populate_key_value_table(self.magini_table, loaded.magini_pairs)
         self._populate_key_value_table(self.inaniwa_table, loaded.inaniwa_pairs)
+        self._populate_key_value_table(self.at_table, loaded.at_pairs)
         self._populate_key_value_table(self.amf_table, loaded.amf_pairs)
         self.set_loaded_files(loaded.file_paths, loaded.file_previews)
 

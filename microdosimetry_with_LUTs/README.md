@@ -470,6 +470,100 @@ z_d_D_mean_Gy,z_d_D_star_mean_Gy,z_n_D_mean_Gy
 
 ---
 
+## AT total mean calculations
+
+The `AT` mode computes point-estimate mean quantities from one phase-space file
+using the Amorphous Track lookup tables:
+
+```text
+lookup_tables/AT/1H_rd0.2_Rn8.0_LUT.csv
+lookup_tables/AT/12C_rd0.2_Rn8.0_LUT.csv
+```
+
+Each AT CSV is expected to contain eight columns:
+
+```csv
+energy,LET,yF,yD,ystar,zF,zD,zstar
+```
+
+The command is:
+
+```bash
+./microdosimetry_with_LUTs AT ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output proton
+./microdosimetry_with_LUTs AT ../lookup_tables ../input/PhaseSpace_33mm.phsp ../output carbon
+```
+
+The last argument selects which AT LUT family to use. Each charged phase-space
+row is decoded to its ion atomic number `Z` and mass number `A`, but only rows
+matching the selected family contribute. The current AT lookup folder contains
+tables for:
+
+- `proton`: `1H`, proton / hydrogen-1 rows
+- `carbon`: `12C`, carbon-12 rows
+
+Rows that do not decode to the selected exact ion identity are ignored by this
+mode. This avoids mixing small numbers of low-energy carbon rows into a
+proton-beam AT summary unless `carbon` is explicitly selected. The LUT query
+energy is:
+
+```text
+E_i = KE_k / A_k   [MeV/u]
+```
+
+where `KE_k` is the row kinetic energy from phase-space column 6 and `A_k` is
+the decoded mass number. Rows with query energies below or above the selected
+AT table range are skipped.
+
+The implemented discrete formulas use the phase-space row weight as the
+mixed-field frequency weight:
+
+```text
+W_k = w_k
+```
+
+The lineal-energy quantities are:
+
+```text
+y_F    = sum(W_k * yF_LUT(E_i, Z_k, A_k))    / sum(W_k)
+y_D    = sum(W_k * yD_LUT(E_i, Z_k, A_k))    / sum(W_k)
+y_star = sum(W_k * ystar_LUT(E_i, Z_k, A_k)) / sum(W_k)
+```
+
+The specific-energy quantities use the same `W_k` weighting:
+
+```text
+z_F    = sum(W_k * zF_LUT(E_i, Z_k, A_k))    / sum(W_k)
+z_D    = sum(W_k * zD_LUT(E_i, Z_k, A_k))    / sum(W_k)
+z_star = sum(W_k * zstar_LUT(E_i, Z_k, A_k)) / sum(W_k)
+```
+
+where `w_k` is the phase-space weight from column 7. This weighting treats the
+phase-space rows as samples of the selected particle's kinetic-energy
+distribution and avoids using `y_F` itself as the mixed-field denominator.
+
+The output directory receives:
+
+```text
+at_summary.csv
+at_diagnostics.csv
+```
+
+`at_summary.csv` has this format:
+
+```csv
+selected_particle,charged_particle_count,matched_particle_count,skipped_particle_count,selected_particle_count,skipped_below_range_count,skipped_above_range_count,total_matched_weight,total_frequency_weight,y_F_keV_per_um,y_D_keV_per_um,y_star_keV_per_um,z_F_Gy,z_D_Gy,z_star_Gy,y_F_weighted_numerator,y_D_weighted_numerator,y_star_weighted_numerator,z_F_weighted_numerator,z_D_weighted_numerator,z_star_weighted_numerator
+...,...,...,...,...,...,...,...,...,...,...,...,...,...,...,...,...,...,...,...,...
+```
+
+`at_diagnostics.csv` groups the selected-particle rows by `MeV/u` band and
+reports row counts, skipped-below-range counts, skipped-above-range counts,
+frequency-weight fractions, and per-band contributions to each reported mean.
+
+No statistical uncertainty is currently estimated in `AT`, matching the current
+`Magini` and `Inaniwa` point-estimate-only workflows.
+
+---
+
 ## AMF TOPAS calculations
 
 The `AMF-stage` and `AMF-run` modes prepare and run the TOPAS Analytical
@@ -892,6 +986,7 @@ make -j8
 ./microdosimetry_with_LUTs LET ../lookup_tables ../input/PhaseSpace.phsp ../output
 ./microdosimetry_with_LUTs Magini ../lookup_tables ../input/PhaseSpace.phsp ../output
 ./microdosimetry_with_LUTs Inaniwa ../lookup_tables ../input/PhaseSpace.phsp ../output
+./microdosimetry_with_LUTs AT ../lookup_tables ../input/PhaseSpace.phsp ../output proton
 python3 ../macros/plot_spectrum.py ../output/poly_spectrum.csv --x y_keV_per_um --y yd_y --output-dir ../output --title "yd(y) vs y" --logx
 ```
 
@@ -903,4 +998,5 @@ That is enough to:
 - calculate LET summaries,
 - calculate Magini total mean quantities,
 - calculate Inaniwa total mean quantities,
+- calculate AT total mean quantities,
 - save the JPEG plot.

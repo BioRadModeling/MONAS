@@ -9,6 +9,8 @@
 #include "AmfGeometryDeriver.h"
 #include "AmfResultParser.h"
 #include "AmfRunner.h"
+#include "AtCalculator.h"
+#include "AtLookup.h"
 #include "CsvWriter.h"
 #include "InaniwaCalculator.h"
 #include "InaniwaLookup.h"
@@ -29,6 +31,32 @@ std::string toLower(std::string s) {
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
     return s;
+}
+
+AtParticle parseAtParticle(const std::string& particleName) {
+    const std::string lower = toLower(particleName);
+
+    if (lower == "proton" || lower == "h" || lower == "1h") {
+        return AtParticle::Proton;
+    }
+    if (lower == "carbon" || lower == "c" || lower == "12c") {
+        return AtParticle::Carbon;
+    }
+
+    throw std::runtime_error(
+        "Unknown AT particle '" + particleName +
+        "'. Expected proton or carbon.");
+}
+
+std::string atParticleLabel(AtParticle particle) {
+    switch (particle) {
+        case AtParticle::Proton:
+            return "proton";
+        case AtParticle::Carbon:
+            return "carbon";
+    }
+
+    return "unknown";
 }
 
 LutFamily parseLutFamily(const std::string& lutName) {
@@ -359,6 +387,10 @@ void printUsage(const char* programName) {
         << "    " << programName
         << " Inaniwa <lookupRoot> <phspFile> <outputDir>\n"
         << "\n"
+        << "  AT:\n"
+        << "    " << programName
+        << " AT <lookupRoot> <phspFile> <outputDir> <proton|carbon>\n"
+        << "\n"
         << "  AMF staging:\n"
         << "    " << programName
         << " AMF-stage <lookupRoot> <phaseSpaceBase> <sourceTopasTxt> <stagedRunDir> "
@@ -597,6 +629,63 @@ int main(int argc, char* argv[]) {
             std::cout << "Charged particles found: " << chargedParticles.size() << "\n";
             std::cout << "Matched ion rows used: " << summary.matchedParticleCount << "\n";
             std::cout << "Inaniwa summary CSV: " << summaryCsv << "\n";
+            return 0;
+        }
+
+        if (mode == "AT") {
+            if (argc != 6) {
+                throw std::runtime_error(
+                    "AT requires: <lookupRoot> <phspFile> <outputDir> <proton|carbon>");
+            }
+
+            const fs::path lookupRoot = argv[2];
+            const fs::path atDirectory = lookupRoot / "AT";
+            const fs::path phspFile = argv[3];
+            const fs::path outputDir = argv[4];
+            const AtParticle selectedParticle = parseAtParticle(argv[5]);
+
+            if (!fs::exists(atDirectory) || !fs::is_directory(atDirectory)) {
+                throw std::runtime_error(
+                    "AT lookup folder not found: " + atDirectory.string());
+            }
+
+            PhaseSpaceReader reader;
+            const std::vector<ChargedParticleRecord> chargedParticles =
+                reader.readChargedParticles(phspFile);
+
+            const AtLookup lookup = AtLookup::loadFromDirectory(atDirectory);
+
+            AtCalculator calculator;
+            const AtSummary summary =
+                calculator.calculate(lookup, chargedParticles, selectedParticle);
+
+            fs::create_directories(outputDir);
+            const fs::path summaryCsv = outputDir / "at_summary.csv";
+            const fs::path diagnosticsCsv = outputDir / "at_diagnostics.csv";
+            CsvWriter::writeAtSummary(summaryCsv, summary);
+            CsvWriter::writeAtDiagnostics(diagnosticsCsv, summary);
+
+            std::cout << "AT calculation completed.\n";
+            std::cout << "AT folder: " << atDirectory << "\n";
+            std::cout << "AT particle: " << atParticleLabel(selectedParticle) << "\n";
+            std::cout << "Phase-space file: " << phspFile << "\n";
+            std::cout << "Output directory: " << outputDir << "\n";
+            std::cout << "Charged particles found: " << chargedParticles.size() << "\n";
+            std::cout << "Matched ion rows used: " << summary.matchedParticleCount << "\n";
+            std::cout << "Skipped charged rows: " << summary.skippedParticleCount << "\n";
+            std::cout << "Selected particle rows: " << summary.selectedParticleCount << "\n";
+            std::cout << "Skipped below LUT range: " << summary.skippedBelowRangeCount << "\n";
+            std::cout << "Skipped above LUT range: " << summary.skippedAboveRangeCount << "\n";
+            std::cout << "Total frequency weight: "
+                      << summary.totalFrequencyWeight << "\n";
+            std::cout << "y_F [keV/um]: " << summary.yFKeVPerUm << "\n";
+            std::cout << "y_D [keV/um]: " << summary.yDKeVPerUm << "\n";
+            std::cout << "y* [keV/um]: " << summary.yStarKeVPerUm << "\n";
+            std::cout << "z_F [Gy]: " << summary.zFGy << "\n";
+            std::cout << "z_D [Gy]: " << summary.zDGy << "\n";
+            std::cout << "z* [Gy]: " << summary.zStarGy << "\n";
+            std::cout << "AT summary CSV: " << summaryCsv << "\n";
+            std::cout << "AT diagnostics CSV: " << diagnosticsCsv << "\n";
             return 0;
         }
 

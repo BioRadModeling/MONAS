@@ -22,6 +22,8 @@ class AppState:
     enable_let: bool = True
     enable_magini: bool = True
     enable_inaniwa: bool = True
+    enable_at: bool = True
+    at_particle: str = "proton"
     amf_quantity: str = "AMFSpectra"
     amf_domain_radius_um: float = 0.28
     amf_stopping_power: str = "Topas"

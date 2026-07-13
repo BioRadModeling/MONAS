@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "AtCalculator.h"
 #include "InaniwaCalculator.h"
 #include "LetCalculator.h"
 #include "MaginiCalculator.h"
@@ -47,4 +48,10 @@ public:
 
     static void writeMaginiSummary(const std::filesystem::path& outPath,
                                    const MaginiSummary& summary);
+
+    static void writeAtSummary(const std::filesystem::path& outPath,
+                               const AtSummary& summary);
+
+    static void writeAtDiagnostics(const std::filesystem::path& outPath,
+                                   const AtSummary& summary);
 };

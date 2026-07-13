@@ -29,6 +29,7 @@ class LoadedResults:
     let_rows: list[list[str]] = field(default_factory=list)
     magini_pairs: list[tuple[str, str]] = field(default_factory=list)
     inaniwa_pairs: list[tuple[str, str]] = field(default_factory=list)
+    at_pairs: list[tuple[str, str]] = field(default_factory=list)
     amf_pairs: list[tuple[str, str]] = field(default_factory=list)
     file_paths: list[Path] = field(default_factory=list)
     file_previews: dict[str, str] = field(default_factory=dict)
@@ -60,12 +61,14 @@ class ResultsLoader:
         let_path = self._resolve_output_file(output_dir, "let_summary", state, phase_space_token)
         magini_path = self._resolve_output_file(output_dir, "magini_summary", state, phase_space_token)
         inaniwa_path = self._resolve_output_file(output_dir, "inaniwa_summary", state, phase_space_token)
+        at_path = self._resolve_output_file(output_dir, "at_summary", state, phase_space_token)
 
         loaded.spectrum_file = spectrum_path if spectrum_path.exists() else None
         loaded.spectrum_summary_text, loaded.spectrum_points = self._load_spectrum(spectrum_path)
         loaded.let_headers, loaded.let_rows = self._load_csv_table(let_path)
         loaded.magini_pairs = self._load_key_value_summary(magini_path)
         loaded.inaniwa_pairs = self._load_key_value_summary(inaniwa_path)
+        loaded.at_pairs = self._load_key_value_summary(at_path)
         loaded.preferred_file = self._preferred_default_file(
             loaded.file_paths,
             loaded.preferred_metric_files,
@@ -73,6 +76,7 @@ class ResultsLoader:
             let_path if let_path.exists() else None,
             magini_path if magini_path.exists() else None,
             inaniwa_path if inaniwa_path.exists() else None,
+            at_path if at_path.exists() else None,
             state,
         )
         return loaded
@@ -424,6 +428,8 @@ class ResultsLoader:
             name.startswith("let_summary")
             or name.startswith("magini_summary")
             or name.startswith("inaniwa_summary")
+            or name.startswith("at_summary")
+            or name.startswith("at_diagnostics")
         ):
             group_score = 0
         elif name.endswith(".csv"):
@@ -449,6 +455,8 @@ class ResultsLoader:
             "let_summary",
             "magini_summary",
             "inaniwa_summary",
+            "at_summary",
+            "at_diagnostics",
         ):
             if lower.startswith(stem):
                 return stem
@@ -490,6 +498,7 @@ class ResultsLoader:
         let_path: Path | None,
         magini_path: Path | None,
         inaniwa_path: Path | None,
+        at_path: Path | None,
         state: AppState,
     ) -> Path | None:
         if not file_paths:
@@ -499,7 +508,7 @@ class ResultsLoader:
             return preferred_metric_files.get("yd_y") or spectrum_path or file_paths[0]
 
         if state.approach == "means":
-            for path in (let_path, magini_path, inaniwa_path):
+            for path in (let_path, magini_path, inaniwa_path, at_path):
                 if path is not None:
                     return path
 

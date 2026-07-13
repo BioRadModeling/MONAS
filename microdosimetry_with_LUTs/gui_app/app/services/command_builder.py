@@ -95,6 +95,21 @@ def build_command_specs(state: AppState) -> list[CommandSpec]:
                 )
             )
 
+        if state.enable_at:
+            commands.append(
+                CommandSpec(
+                    label="AT summary",
+                    argv=[
+                        executable,
+                        "AT",
+                        lookup_root,
+                        phase_space_file,
+                        output_dir,
+                        state.at_particle,
+                    ],
+                )
+            )
+
         return commands
 
     return []
@@ -208,6 +223,9 @@ def planned_output_files(state: AppState) -> list[Path]:
         files.append(output_dir / "magini_summary.csv")
     if state.enable_inaniwa:
         files.append(output_dir / "inaniwa_summary.csv")
+    if state.enable_at:
+        files.append(output_dir / "at_summary.csv")
+        files.append(output_dir / "at_diagnostics.csv")
     return files
 
 

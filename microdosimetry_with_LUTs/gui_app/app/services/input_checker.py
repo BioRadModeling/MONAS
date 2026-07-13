@@ -9,6 +9,10 @@ from app.state import AppState
 
 LET_ELEMENTS = ("H", "He", "Li", "Be", "B", "C", "N", "O")
 INANIWA_ATOMIC_NUMBERS = tuple(range(1, 11))
+AT_LUT_FILES = {
+    "proton": "1H_rd0.2_Rn8.0_LUT.csv",
+    "carbon": "12C_rd0.2_Rn8.0_LUT.csv",
+}
 PROTON_FILENAME_PATTERN = re.compile(r"^Proton_([0-9]+(?:\.[0-9]+)?)_MeV\.csv$")
 CARTECHINI_FILENAME_PATTERN = re.compile(
     r"^H_E([0-9]+(?:\.[0-9]+)?)_R(?:0\.5|1\.0|8(?:\.0)?)(?:_[^.]+)?\.txt$"
@@ -288,7 +292,12 @@ class InputChecker:
         scan: PhaseSpaceScan,
         warnings: list[str],
     ) -> None:
-        if not any((state.enable_let, state.enable_magini, state.enable_inaniwa)):
+        if not any((
+            state.enable_let,
+            state.enable_magini,
+            state.enable_inaniwa,
+            state.enable_at,
+        )):
             warnings.append("No mean-value calculation is enabled.")
 
         if state.enable_let:
@@ -309,7 +318,14 @@ class InputChecker:
             if missing:
                 warnings.append("Missing Inaniwa lookup tables: Zp_" + ", Zp_".join(missing))
 
-        if (state.enable_let or state.enable_inaniwa) and scan.unsupported_charged_rows > 0:
+        if state.enable_at:
+            at_filename = AT_LUT_FILES.get(state.at_particle)
+            if at_filename is None:
+                warnings.append("Unknown AT LUT selection: " + state.at_particle)
+            elif not (state.lookup_root / "AT" / at_filename).exists():
+                warnings.append("Missing AT lookup table: " + at_filename)
+
+        if (state.enable_let or state.enable_inaniwa or state.enable_at) and scan.unsupported_charged_rows > 0:
             warnings.append(
                 f"{scan.unsupported_charged_rows} charged rows do not map to the currently supported LET or ion mean-value lookup families and would be skipped."
             )
