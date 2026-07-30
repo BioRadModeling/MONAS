@@ -343,11 +343,16 @@ The `Magini` mode computes the total proton mean quantities `y_F`, `y_D`, and
 lookup_tables/Magini/Magini.csv
 ```
 
-The Magini CSV is expected to contain four columns:
+The top-level `Magini.csv` is the aggregate mean-value table. It is expected to
+contain these columns:
 
 ```csv
-E_i_MeV,y_F_LUT_keV_per_um,y_star_LUT_keV_per_um,y_D_LUT_keV_per_um
+E,yF,yD,yS,y_fmax_err,y_dmax_err
 ```
+
+Additional columns in the file are ignored by the `Magini` mode. The
+per-energy `*.csv` files in the same folder contain the corresponding `y,f,d`
+spectra, but the total mean calculation uses the aggregate `Magini.csv` table.
 
 The command is:
 
@@ -364,12 +369,28 @@ Magini LUT range are clamped to the nearest endpoint.
 The implemented discrete formulas are:
 
 ```text
-y_F    = sum(w_i * y_F_LUT(E_i)) / sum(w_i)
-y_D    = sum(w_i * y_D_LUT(E_i) * y_F_LUT(E_i)) / sum(w_i * y_F_LUT(E_i))
-y_star = sum(w_i * y_star_LUT(E_i) * y_F_LUT(E_i)) / sum(w_i * y_F_LUT(E_i))
+p_i    = w_i / sum(w_i)
+F      = sum(p_i * f_i)
+D      = sum(p_i * d_i * f_i) / F
+y_star = sum(p_i * s_i * f_i) / F
 ```
 
-where `w_i` is the proton phase-space weight for row `i`.
+where `w_i` is the proton phase-space weight for row `i`, `f_i = yF(E_i)`,
+`d_i = yD(E_i)`, and `s_i = yS(E_i)`.
+
+The `y_fmax_err` and `y_dmax_err` columns are propagated as maximum LUT error
+bounds. With `uf_i = y_fmax_err(E_i)` and `ud_i = y_dmax_err(E_i)`, the output
+errors are:
+
+```text
+u_F = sum(p_i * uf_i)
+
+u_D = sum(abs(p_i * f_i / F) * ud_i)
+    + sum(abs(p_i * (d_i - D) / F) * uf_i)
+```
+
+These are conservative propagated bounds from the LUT error columns, not
+statistical standard deviations.
 
 The output directory receives:
 
@@ -380,8 +401,8 @@ magini_summary.csv
 with this format:
 
 ```csv
-proton_count,total_proton_weight,y_F_keV_per_um,y_D_keV_per_um,y_star_keV_per_um,y_D_weighted_numerator,y_star_weighted_numerator
-1, ..., ..., ..., ..., ..., ...
+proton_count,total_proton_weight,y_F_keV_per_um,y_D_keV_per_um,y_star_keV_per_um,y_F_lut_error_max_keV_per_um,y_D_lut_error_max_keV_per_um,y_D_weighted_numerator,y_star_weighted_numerator
+1, ..., ..., ..., ..., ..., ..., ..., ...
 ```
 
 This mode is intended for running the same calculation on phase-space files at
@@ -476,8 +497,8 @@ The `AT` mode computes point-estimate mean quantities from one phase-space file
 using the Amorphous Track lookup tables:
 
 ```text
-lookup_tables/AT/1H_rd0.2_Rn8.0_LUT.csv
-lookup_tables/AT/12C_rd0.2_Rn8.0_LUT.csv
+lookup_tables/AT/1H_rd0.5_Rn8.0_LUT.csv
+lookup_tables/AT/12C_rd0.5_Rn8.0_LUT.csv
 ```
 
 Each AT CSV is expected to contain eight columns:

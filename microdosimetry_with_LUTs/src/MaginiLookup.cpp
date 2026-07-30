@@ -1,7 +1,9 @@
 #include "MaginiLookup.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
+#include <initializer_list>
 #include <sstream>
 #include <stdexcept>
 
@@ -17,6 +19,18 @@ std::vector<std::string> splitCsvLine(const std::string& line) {
     }
 
     return fields;
+}
+
+std::string trim(std::string value) {
+    auto isNotSpace = [](unsigned char c) {
+        return !std::isspace(c);
+    };
+
+    value.erase(value.begin(),
+                std::find_if(value.begin(), value.end(), isNotSpace));
+    value.erase(std::find_if(value.rbegin(), value.rend(), isNotSpace).base(),
+                value.end());
+    return value;
 }
 
 bool tryParseDouble(const std::string& s, double& value) {
@@ -36,6 +50,80 @@ double interpolateLinear(double lowerValue,
     return lowerValue * lowerWeight + upperValue * upperWeight;
 }
 
+std::size_t findHeaderIndex(const std::vector<std::string>& headers,
+                            std::initializer_list<const char*> names) {
+    for (std::size_t i = 0; i < headers.size(); ++i) {
+        const std::string header = trim(headers[i]);
+        for (const char* name : names) {
+            if (header == name) {
+                return i;
+            }
+        }
+    }
+
+    return headers.size();
+}
+
+struct MaginiColumnIndices {
+    std::size_t energy{0};
+    std::size_t yF{1};
+    std::size_t yStar{2};
+    std::size_t yD{3};
+    std::size_t yFMaxError{static_cast<std::size_t>(-1)};
+    std::size_t yDMaxError{static_cast<std::size_t>(-1)};
+};
+
+MaginiColumnIndices resolveHeaderColumns(const std::vector<std::string>& headers,
+                                         const std::filesystem::path& csvPath) {
+    MaginiColumnIndices indices;
+    indices.energy = findHeaderIndex(headers, {"E", "E_i_MeV"});
+    indices.yF = findHeaderIndex(headers, {"yF", "y_F_LUT_keV_per_um"});
+    indices.yD = findHeaderIndex(headers, {"yD", "y_D_LUT_keV_per_um"});
+    indices.yStar = findHeaderIndex(headers, {"yS", "y_star_LUT_keV_per_um"});
+    indices.yFMaxError = findHeaderIndex(headers, {"y_fmax_err"});
+    indices.yDMaxError = findHeaderIndex(headers, {"y_dmax_err"});
+
+    if (indices.energy == headers.size() ||
+        indices.yF == headers.size() ||
+        indices.yD == headers.size() ||
+        indices.yStar == headers.size()) {
+        throw std::runtime_error(
+            "Magini CSV missing one or more required columns "
+            "(E/yF/yD/yS or legacy equivalents): " + csvPath.string());
+    }
+
+    return indices;
+}
+
+bool parseMaginiRow(const std::vector<std::string>& fields,
+                    const MaginiColumnIndices& columns,
+                    MaginiRow& row) {
+    const std::size_t maxIndex =
+        std::max({columns.energy, columns.yF, columns.yD, columns.yStar});
+    if (fields.size() <= maxIndex) {
+        return false;
+    }
+
+    if (!tryParseDouble(fields[columns.energy], row.energyMeV) ||
+        !tryParseDouble(fields[columns.yF], row.yFLutKeVPerUm) ||
+        !tryParseDouble(fields[columns.yD], row.yDLutKeVPerUm) ||
+        !tryParseDouble(fields[columns.yStar], row.yStarLutKeVPerUm)) {
+        return false;
+    }
+
+    if (columns.yFMaxError < fields.size() &&
+        !tryParseDouble(fields[columns.yFMaxError], row.yFMaxErrorKeVPerUm)) {
+        return false;
+    }
+
+    if (columns.yDMaxError < fields.size() &&
+        !tryParseDouble(fields[columns.yDMaxError], row.yDMaxErrorKeVPerUm)) {
+        return false;
+    }
+
+    return true;
+}
+
 }  // namespace
 
 MaginiLookup::MaginiLookup(std::vector<MaginiRow> rows, std::string sourceFile)
@@ -50,6 +138,8 @@ MaginiLookup MaginiLookup::loadFromCsv(const std::filesystem::path& csvPath) {
 
     std::vector<MaginiRow> rows;
     std::string line;
+    MaginiColumnIndices columns;
+    bool sawData = false;
 
     while (std::getline(in, line)) {
         if (line.empty()) {
@@ -62,10 +152,14 @@ MaginiLookup MaginiLookup::loadFromCsv(const std::filesystem::path& csvPath) {
         }
 
         MaginiRow row;
-        if (!tryParseDouble(fields[0], row.energyMeV) ||
-            !tryParseDouble(fields[1], row.yFLutKeVPerUm) ||
-            !tryParseDouble(fields[2], row.yStarLutKeVPerUm) ||
-            !tryParseDouble(fields[3], row.yDLutKeVPerUm)) {
+        if (!sawData && !parseMaginiRow(fields, columns, row)) {
+            columns = resolveHeaderColumns(fields, csvPath);
+            sawData = true;
+            continue;
+        }
+
+        sawData = true;
+        if (!parseMaginiRow(fields, columns, row)) {
             continue;
         }
 
@@ -109,6 +203,8 @@ MaginiInterpolatedValues MaginiLookup::interpolate(double energyMeV) const {
             row.yFLutKeVPerUm,
             row.yStarLutKeVPerUm,
             row.yDLutKeVPerUm,
+            row.yFMaxErrorKeVPerUm,
+            row.yDMaxErrorKeVPerUm,
             row.energyMeV,
             row.energyMeV,
             1.0,
@@ -122,6 +218,8 @@ MaginiInterpolatedValues MaginiLookup::interpolate(double energyMeV) const {
             row.yFLutKeVPerUm,
             row.yStarLutKeVPerUm,
             row.yDLutKeVPerUm,
+            row.yFMaxErrorKeVPerUm,
+            row.yDMaxErrorKeVPerUm,
             row.energyMeV,
             row.energyMeV,
             1.0,
@@ -146,6 +244,10 @@ MaginiInterpolatedValues MaginiLookup::interpolate(double energyMeV) const {
         interpolateLinear(lower.yStarLutKeVPerUm, upper.yStarLutKeVPerUm,
                           lowerWeight, upperWeight),
         interpolateLinear(lower.yDLutKeVPerUm, upper.yDLutKeVPerUm,
+                          lowerWeight, upperWeight),
+        interpolateLinear(lower.yFMaxErrorKeVPerUm, upper.yFMaxErrorKeVPerUm,
+                          lowerWeight, upperWeight),
+        interpolateLinear(lower.yDMaxErrorKeVPerUm, upper.yDMaxErrorKeVPerUm,
                           lowerWeight, upperWeight),
         lower.energyMeV,
         upper.energyMeV,

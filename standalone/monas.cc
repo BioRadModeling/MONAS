@@ -24,12 +24,234 @@
 #include<fstream>
 #include<algorithm>
 #include<random>
+#include<sstream>
+#include<stdexcept>
+#include<cerrno>
+#include<sys/stat.h>
+#include<sys/types.h>
 //#include<filesystem>
 #include <chrono>
+#include <ctime>
 #include "TsGetSurvivalRBEQualityFactor.hh"
+#include "TsBinnedSpectrumReader.hh"
 #include "TsLinealEnergy.hh"
 #include "TsSpecificEnergy.hh"
 using namespace std;
+
+namespace {
+
+struct SpectrumInputSpec {
+	string SourceName;
+	string Type;
+	vector<string> Arguments;
+};
+
+vector<string> SplitString(const string& text, char delimiter)
+{
+	vector<string> parts;
+	string part;
+	stringstream stream(text);
+	while(getline(stream, part, delimiter))
+		parts.push_back(part);
+	return parts;
+}
+
+string SanitizeForFilename(const string& text)
+{
+	string output;
+	for(char c:text)
+	{
+		if((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-')
+			output.push_back(c);
+		else
+			output.push_back('_');
+	}
+	return output.empty() ? "Spectrum" : output;
+}
+
+bool DirectoryExists(const string& path)
+{
+	struct stat info;
+	return stat(path.c_str(), &info) == 0 && (info.st_mode & S_IFDIR);
+}
+
+void EnsureDirectory(const string& path)
+{
+	if(path.empty() || path == ".")
+		return;
+	if(DirectoryExists(path))
+		return;
+
+	string current;
+	for(std::size_t i = 0; i < path.size(); ++i)
+	{
+		current.push_back(path[i]);
+		if(path[i] != '/' && i + 1 != path.size())
+			continue;
+		if(current.empty() || current == "/")
+			continue;
+		if(!DirectoryExists(current))
+		{
+			if(mkdir(current.c_str(), 0755) != 0 && errno != EEXIST)
+				throw runtime_error("Cannot create output directory: " + current);
+		}
+	}
+}
+
+string JoinPath(const string& directory, const string& filename)
+{
+	if(directory.empty() || directory == ".")
+		return filename;
+	const char lastChar = directory[directory.size() - 1];
+	if(lastChar == '/' || lastChar == '\\')
+		return directory + filename;
+	return directory + "/" + filename;
+}
+
+SpectrumInputSpec ParseSpectrumSpec(const string& spec)
+{
+	const vector<string> fields = SplitString(spec, ':');
+	if(fields.size() < 3)
+		throw runtime_error("Invalid -spectrum spec '" + spec + "'. Expected name:type:paths...");
+
+	SpectrumInputSpec parsed;
+	parsed.SourceName = fields[0];
+	parsed.Type = fields[1];
+	for(std::size_t i = 2; i < fields.size(); ++i)
+		parsed.Arguments.push_back(fields[i]);
+	return parsed;
+}
+
+TsBinnedSpectrum ReadSpectrumFromSpec(const SpectrumInputSpec& spec)
+{
+	if(spec.Type == "poly")
+	{
+		if(spec.Arguments.size() != 1)
+			throw runtime_error("Poly spectrum spec requires name:poly:poly_spectrum.csv");
+		return TsBinnedSpectrumReader::ReadPolySpectrumCsv(spec.Arguments[0], spec.SourceName);
+	}
+	if(spec.Type == "amf")
+	{
+		if(spec.Arguments.size() != 3)
+			throw runtime_error("AMF spectrum spec requires name:amf:spectra.csv:moments.csv:x,y,z");
+		return TsBinnedSpectrumReader::ReadAmfSpectrumCsv(spec.Arguments[0], spec.Arguments[1], spec.Arguments[2], spec.SourceName);
+	}
+	if(spec.Type == "topas")
+	{
+		if(spec.Arguments.size() != 1)
+			throw runtime_error("TOPAS spectrum spec requires name:topas:ySpecfile.txt");
+		return TsBinnedSpectrumReader::ReadTopasYSpecfile(spec.Arguments[0], spec.SourceName);
+	}
+
+	throw runtime_error("Unknown spectrum type '" + spec.Type + "' for source '" + spec.SourceName + "'.");
+}
+
+double FiniteStdDev(double variance)
+{
+	const double stddev = sqrt(variance);
+	return std::isfinite(stddev) ? stddev : 0.0;
+}
+
+void ApplyMKMParameters(TsGetSurvivalRBEQualityFactor& calculator,
+                        vector<double>& Doses,
+                        double MKModel_alpha0,
+                        double MKModel_beta,
+                        double MKModel_alphaX,
+                        double MKModel_betaX,
+                        double MKModel_rd,
+                        double MKModel_Rn,
+                        double MKModel_y0,
+                        int fSetMultiEventStatistic)
+{
+	calculator.SetDosesMacro(&Doses[0]);
+	calculator.SetMCMultieventIterations(fSetMultiEventStatistic);
+	calculator.SetMKModel_alpha0(MKModel_alpha0);
+	calculator.SetMKModel_beta(MKModel_beta);
+	calculator.SetMKModel_alphaX(MKModel_alphaX);
+	calculator.SetMKModel_betaX(MKModel_betaX);
+	calculator.SetMKModel_rd(MKModel_rd);
+	calculator.SetMKModel_Rn(MKModel_Rn);
+	calculator.SetMKModel_y0(MKModel_y0);
+}
+
+void AppendSummaryRows(std::ofstream& summary,
+                       const TsBinnedSpectrum& spectrum,
+                       const TsGetSurvivalRBEQualityFactor& calculator)
+{
+	const vector<double>& doses = calculator.GetLastDoses();
+	const vector<double>& survival = calculator.GetLastSurvival();
+	const vector<double>& survivalVariance = calculator.GetLastSurvivalVariance();
+	const vector<double>& rbe = calculator.GetLastRBE();
+	const vector<double>& rbeVariance = calculator.GetLastRBEVariance();
+
+	for(std::size_t i = 0; i < doses.size(); ++i)
+	{
+		summary << spectrum.SourceName << ','
+		        << calculator.GetLastModelName() << ','
+		        << doses[i] << ','
+		        << survival[i] << ','
+		        << FiniteStdDev(survivalVariance[i]) << ','
+		        << rbe[i] << ','
+		        << FiniteStdDev(rbeVariance[i]) << ','
+		        << spectrum.yF << ','
+		        << spectrum.yD << '\n';
+	}
+}
+
+void WriteBinnedModeManifest(const string& outputDirectory,
+                             int argc,
+                             char* argv[],
+                             const vector<string>& spectrumSpecs,
+                             bool MKMSatCorrFlag,
+                             bool MKMnonPoissFlag,
+                             bool SMKMFlag,
+                             const vector<double>& Doses,
+                             double MKModel_alpha0,
+                             double MKModel_beta,
+                             double MKModel_alphaX,
+                             double MKModel_betaX,
+                             double MKModel_rd,
+                             double MKModel_Rn,
+                             double MKModel_y0)
+{
+	const string manifestPath = JoinPath(outputDirectory, "MKM_from_spectra_manifest.txt");
+	ofstream manifest(manifestPath.c_str());
+	if(!manifest)
+		throw runtime_error("Cannot write manifest file: " + manifestPath);
+
+	const time_t now = time(0);
+	manifest << "MONAS deterministic binned-spectrum MKM run\n";
+	manifest << "Run timestamp: " << ctime(&now);
+	manifest << "Command:";
+	for(int i = 0; i < argc; ++i)
+		manifest << ' ' << argv[i];
+	manifest << "\n\n";
+
+	manifest << "Output directory: " << outputDirectory << "\n\n";
+	manifest << "Input spectra:\n";
+	for(const string& spec:spectrumSpecs)
+		manifest << "- " << spec << "\n";
+
+	manifest << "\nModels:\n";
+	if(MKMSatCorrFlag)
+		manifest << "- MKM_SaturationCorrected\n";
+	if(MKMnonPoissFlag)
+		manifest << "- MKM_nonPoisson\n";
+	if(SMKMFlag)
+		manifest << "- SMKM\n";
+
+	manifest << "\nDose macro: " << Doses[0] << " " << Doses[1] << " " << Doses[2] << "\n";
+	manifest << "\nMKM parameters:\n";
+	manifest << "MKM_alpha0 = " << MKModel_alpha0 << " Gy-1\n";
+	manifest << "MKM_beta = " << MKModel_beta << " Gy-2\n";
+	manifest << "MKM_alphaX = " << MKModel_alphaX << " Gy-1\n";
+	manifest << "MKM_betaX = " << MKModel_betaX << " Gy-2\n";
+	manifest << "MKM_rDomain = " << MKModel_rd << " um\n";
+	manifest << "MKM_rNucleus = " << MKModel_Rn << " um\n";
+	manifest << "MKM_y0 = " << MKModel_y0 << " keV/um\n";
+}
+
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -87,6 +309,9 @@ int main(int argc, char *argv[])
 	vector<double> Doses = {0,10,0.5}; //Unit:Gy
 	bool MKMSatCorrFlag = 0, MKMnonPoissFlag = 0, SMKMFlag = 0, DSMKMFlag = 0, GSM2Flag = 0, RBEWeightingFlag = 0, QfICRUFlag = 0, QfKellFlag = 0, UseTwoSpecraFlag =0;
 	bool H460Flag = 0, H1437Flag = 0;
+	bool MKMFromSpectraFlag = false;
+	string OutputDirectory = ".";
+	vector<string> SpectrumSpecs;
 	/////////////////////////////////////////////////////////////
 	//
 	// READ INPUT PARAMETERS
@@ -131,6 +356,7 @@ int main(int argc, char *argv[])
 		if(strcmp(argv[i],"-SMKM") == 0) {SMKMFlag = 1;}
 		if(strcmp(argv[i],"-DSMKM") == 0) {DSMKMFlag = 1;}
 		if(strcmp(argv[i],"-GSM2") == 0) {GSM2Flag = 1;}
+		if(strcmp(argv[i],"-MKMFromSpectra") == 0) {MKMFromSpectraFlag = true;}
 
 		if(strcmp(argv[i],"-fGetStatitisticInfo") == 0) {fGetStatitisticInfo = true;}
 		if(strcmp(argv[i],"-fSpectrumUpdateTimes") == 0) {fSpectrumUpdateTimes = stoi(argv[i+1]);}
@@ -147,6 +373,8 @@ int main(int argc, char *argv[])
 			Doses.clear();
 			Doses = {stod(argv[i+1]), stod(argv[i+2]), stod(argv[i+3])};
 		}
+		if(strcmp(argv[i],"-outputDir") == 0) {OutputDirectory = argv[i+1];}
+		if(strcmp(argv[i],"-spectrum") == 0) {SpectrumSpecs.push_back(argv[i+1]);}
 
 		if(strcmp(argv[i],"-topasScorerDomain") == 0) {TopasScorerFileDomain = argv[i+1];} //input file
 		if(strcmp(argv[i],"-topasScorerNucleus") == 0) 
@@ -160,6 +388,14 @@ int main(int argc, char *argv[])
 				<<"-Rc: Cell Nucleus radius [um]" <<endl
 				<<"-CellLine: replace with cell line name (-H460 or -H1437)" <<endl
 				<<"-topasScorer: path/file.phsp with y values" <<endl
+				<<"-MKMFromSpectra: run deterministic binned-spectrum MKM mode" <<endl
+				<<"-spectrum: repeatable deterministic spectrum input:" <<endl
+				<<"           name:poly:file.csv where CSV columns are y_keV_per_um,f_y,yf_y,d_y,yd_y" <<endl
+				<<"           name:topas:ySpecfile.txt" <<endl
+				<<"           name:amf:spectra.csv:moments.csv:x,y,z" <<endl
+				<<"-outputDir: directory for output files; deterministic-spectrum mode also writes MKM_from_spectra_summary.csv and MKM_from_spectra_manifest.txt" <<endl
+				<<"-MKMSatCorr/-MKMnonPoiss/-SMKM: deterministic-spectrum MKM models; defaults to -MKMSatCorr when none is selected" <<endl
+				<<"-DSMKM/-GSM2: not available with -MKMFromSpectra" <<endl
 				<<"-Doses: (initial dose value) (final dose value) (step value)" <<endl
 				<<"-help: list of definitions and inputs" <<endl;
 			return 0;			     
@@ -193,6 +429,71 @@ int main(int argc, char *argv[])
 	}else{
 		// Default values
 		cout << "\033[1;33m\nWARNING: NO SPECIFIC CELL LINE IS SELECTED (USING DEFAULT VALUES)\033[0m\n" << endl;
+	}
+
+	if(MKMFromSpectraFlag)
+	{
+		try
+		{
+			if(SpectrumSpecs.empty())
+				throw runtime_error("-MKMFromSpectra requires at least one -spectrum argument.");
+			if(DSMKMFlag)
+				throw runtime_error("DSMKM is not available in deterministic binned-spectrum mode yet.");
+			if(GSM2Flag)
+				throw runtime_error("GSM2 is not available in deterministic binned-spectrum mode yet.");
+			if(!MKMSatCorrFlag && !MKMnonPoissFlag && !SMKMFlag)
+				MKMSatCorrFlag = true;
+
+			EnsureDirectory(OutputDirectory);
+			const string summaryPath = JoinPath(OutputDirectory, "MKM_from_spectra_summary.csv");
+			ofstream summary(summaryPath.c_str());
+			if(!summary)
+				throw runtime_error("Cannot write summary file: " + summaryPath);
+			summary << "source,model,dose_Gy,survival,survival_std,RBE,RBE_std,yF_keV_per_um,yD_keV_per_um\n";
+			WriteBinnedModeManifest(OutputDirectory, argc, argv, SpectrumSpecs, MKMSatCorrFlag, MKMnonPoissFlag, SMKMFlag, Doses, MKModel_alpha0, MKModel_beta, MKModel_alphaX, MKModel_betaX, MKModel_rd, MKModel_Rn, MKModel_y0);
+
+			cout << "\nRunning deterministic binned-spectrum MKM mode\n";
+			cout << "Output directory: " << OutputDirectory << endl;
+			cout << "Summary file: " << summaryPath << endl;
+
+			for(const string& specText:SpectrumSpecs)
+			{
+				const SpectrumInputSpec spec = ParseSpectrumSpec(specText);
+				TsBinnedSpectrum spectrum = ReadSpectrumFromSpec(spec);
+
+				cout << "\nSpectrum source: " << spectrum.SourceName << endl;
+				cout << "yF: " << spectrum.yF << " keV/um" << endl;
+				cout << "yD: " << spectrum.yD << " keV/um" << endl;
+
+				TsGetSurvivalRBEQualityFactor calculator(spectrum);
+				ApplyMKMParameters(calculator, Doses, MKModel_alpha0, MKModel_beta, MKModel_alphaX, MKModel_betaX, MKModel_rd, MKModel_Rn, MKModel_y0, fSetMultiEventStatistic);
+				calculator.SetOutputDirectory(OutputDirectory);
+				calculator.SetOutputPrefix(SanitizeForFilename(spectrum.SourceName) + "_");
+
+				if(MKMSatCorrFlag)
+				{
+					calculator.GetSurvWithMKModel_SaturationCorr();
+					AppendSummaryRows(summary, spectrum, calculator);
+				}
+				if(MKMnonPoissFlag)
+				{
+					calculator.GetSurvWithMKModel_nonPoissonCorr();
+					AppendSummaryRows(summary, spectrum, calculator);
+				}
+				if(SMKMFlag)
+				{
+					calculator.GetSurvWithSMKModel();
+					AppendSummaryRows(summary, spectrum, calculator);
+				}
+			}
+		}
+		catch(const exception& error)
+		{
+			cerr << "\033[1;31mERROR:: " << error.what() << "\033[0m" << endl;
+			return -1;
+		}
+
+		return 0;
 	}
 
 	/////////////////////////////////////////////////////////////

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -90,6 +91,22 @@ bool parseAtFilename(const std::filesystem::path& csvPath,
     return atomicNumber > 0 && massNumber > 0;
 }
 
+int atFilenamePriority(const std::filesystem::path& csvPath,
+                       int atomicNumber,
+                       int massNumber) {
+    const std::string filename = csvPath.filename().string();
+    if (atomicNumber == 1 && massNumber == 1 &&
+        filename == "1H_rd0.5_Rn8.0_LUT.csv") {
+        return 1;
+    }
+    if (atomicNumber == 6 && massNumber == 12 &&
+        filename == "12C_rd0.5_Rn8.0_LUT.csv") {
+        return 1;
+    }
+
+    return 0;
+}
+
 AtTable loadSingleTable(const std::filesystem::path& csvPath,
                         int atomicNumber,
                         int massNumber) {
@@ -157,7 +174,14 @@ AtLookup AtLookup::loadFromDirectory(const std::filesystem::path& directory) {
         throw std::runtime_error("AT lookup folder not found: " + directory.string());
     }
 
-    std::vector<AtTable> tables;
+    struct Candidate {
+        std::filesystem::path path;
+        int atomicNumber{0};
+        int massNumber{0};
+        int priority{0};
+    };
+
+    std::map<std::pair<int, int>, Candidate> candidates;
     for (const auto& entry : std::filesystem::directory_iterator(directory)) {
         if (!entry.is_regular_file() || entry.path().extension() != ".csv") {
             continue;
@@ -169,12 +193,29 @@ AtLookup AtLookup::loadFromDirectory(const std::filesystem::path& directory) {
             continue;
         }
 
-        tables.push_back(loadSingleTable(entry.path(), atomicNumber, massNumber));
+        const int priority = atFilenamePriority(entry.path(), atomicNumber, massNumber);
+        const std::pair<int, int> ionKey{atomicNumber, massNumber};
+        const Candidate candidate{entry.path(), atomicNumber, massNumber, priority};
+        const auto existing = candidates.find(ionKey);
+        if (existing == candidates.end() || existing->second.priority < priority ||
+            (existing->second.priority == priority &&
+             candidate.path.filename().string() <
+                 existing->second.path.filename().string())) {
+            candidates[ionKey] = candidate;
+        }
     }
 
-    if (tables.empty()) {
+    if (candidates.empty()) {
         throw std::runtime_error(
             "No AT lookup CSVs found in: " + directory.string());
+    }
+
+    std::vector<AtTable> tables;
+    tables.reserve(candidates.size());
+    for (const auto& candidateEntry : candidates) {
+        const Candidate& candidate = candidateEntry.second;
+        tables.push_back(loadSingleTable(
+            candidate.path, candidate.atomicNumber, candidate.massNumber));
     }
 
     std::sort(tables.begin(), tables.end(),
@@ -184,14 +225,6 @@ AtLookup AtLookup::loadFromDirectory(const std::filesystem::path& directory) {
                   }
                   return a.massNumber < b.massNumber;
               });
-
-    for (std::size_t i = 1; i < tables.size(); ++i) {
-        if (tables[i - 1].atomicNumber == tables[i].atomicNumber &&
-            tables[i - 1].massNumber == tables[i].massNumber) {
-            throw std::runtime_error(
-                "Duplicate AT LUT ion identity detected in: " + directory.string());
-        }
-    }
 
     return AtLookup(std::move(tables));
 }

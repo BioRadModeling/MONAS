@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
@@ -10,14 +11,15 @@ from app.state import AppState
 LET_ELEMENTS = ("H", "He", "Li", "Be", "B", "C", "N", "O")
 INANIWA_ATOMIC_NUMBERS = tuple(range(1, 11))
 AT_LUT_FILES = {
-    "proton": "1H_rd0.2_Rn8.0_LUT.csv",
-    "carbon": "12C_rd0.2_Rn8.0_LUT.csv",
+    "proton": "1H_rd0.5_Rn8.0_LUT.csv",
+    "carbon": "12C_rd0.5_Rn8.0_LUT.csv",
 }
 PROTON_FILENAME_PATTERN = re.compile(r"^Proton_([0-9]+(?:\.[0-9]+)?)_MeV\.csv$")
 CARTECHINI_FILENAME_PATTERN = re.compile(
     r"^H_E([0-9]+(?:\.[0-9]+)?)_R(?:0\.5|1\.0|8(?:\.0)?)(?:_[^.]+)?\.txt$"
 )
 CARTECHINI_SPECIES = ("proton", "carbon", "alpha")
+MAGINI_REQUIRED_COLUMNS = ("E", "yF", "yD", "yS", "y_fmax_err", "y_dmax_err")
 
 
 @dataclass
@@ -318,6 +320,9 @@ class InputChecker:
             if missing:
                 warnings.append("Missing Inaniwa lookup tables: Zp_" + ", Zp_".join(missing))
 
+        if state.enable_magini:
+            self._add_magini_warnings(state, scan, warnings)
+
         if state.enable_at:
             at_filename = AT_LUT_FILES.get(state.at_particle)
             if at_filename is None:
@@ -328,6 +333,58 @@ class InputChecker:
         if (state.enable_let or state.enable_inaniwa or state.enable_at) and scan.unsupported_charged_rows > 0:
             warnings.append(
                 f"{scan.unsupported_charged_rows} charged rows do not map to the currently supported LET or ion mean-value lookup families and would be skipped."
+            )
+
+    def _add_magini_warnings(
+        self,
+        state: AppState,
+        scan: PhaseSpaceScan,
+        warnings: list[str],
+    ) -> None:
+        magini_csv = state.lookup_root / "Magini" / "Magini.csv"
+        if not magini_csv.is_file():
+            warnings.append(f"Missing Magini lookup table: {magini_csv}")
+            return
+
+        try:
+            with magini_csv.open("r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                headers = set(reader.fieldnames or [])
+                missing = [
+                    column
+                    for column in MAGINI_REQUIRED_COLUMNS
+                    if column not in headers
+                ]
+                if missing:
+                    warnings.append(
+                        "Magini lookup table is missing required columns: "
+                        + ", ".join(missing)
+                    )
+                    return
+
+                energies = [
+                    float(row["E"])
+                    for row in reader
+                    if row.get("E") not in (None, "")
+                ]
+        except (OSError, ValueError):
+            warnings.append(f"Could not read Magini lookup table: {magini_csv}")
+            return
+
+        if not energies:
+            warnings.append(f"No Magini energy rows were found in: {magini_csv}")
+            return
+
+        low, high = min(energies), max(energies)
+        out_of_range = sum(
+            1
+            for energy in scan.proton_energies
+            if energy < low or energy > high
+        )
+        if out_of_range > 0:
+            warnings.append(
+                f"{out_of_range} proton rows sit outside the Magini LUT range "
+                f"({low:.6g} to {high:.6g} MeV) and will be clamped."
             )
 
     def _read_spectrum_range(self, spectrum_dir: Path) -> tuple[float, float] | None:

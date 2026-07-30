@@ -28,6 +28,8 @@
 #include <vector>
 #include <string>
 
+#include "TsBinnedSpectrum.hh"
+
 
 using namespace std;
 
@@ -35,6 +37,7 @@ class TsGetSurvivalRBEQualityFactor
 {
 	public:
 		TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, double*BinLimit, double* hBinWidth, double* hfy, double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double>hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimesi, bool GetParticleContribution);
+		TsGetSurvivalRBEQualityFactor(const TsBinnedSpectrum& spectrum);
 		~TsGetSurvivalRBEQualityFactor();
 
 		void GetSurvWithMKModel_SaturationCorr();
@@ -54,6 +57,12 @@ class TsGetSurvivalRBEQualityFactor
 		void WriteSurvivivalRBEParticleContribution(string filename, std::vector<double> D, std::vector<std::vector<double>> Vector_Particle);
 		void WriteQParticleContribution(string filename, std::vector<double> Vector_Particle);
 		void Write_yD_RBE10(string filename, double yD, double Dose10, double RBE10);
+		const string& GetLastModelName() const { return fLastModelName; }
+		const std::vector<double>& GetLastDoses() const { return fLastDoses; }
+		const std::vector<double>& GetLastSurvival() const { return fLastSurvival; }
+		const std::vector<double>& GetLastSurvivalVariance() const { return fLastSurvivalVariance; }
+		const std::vector<double>& GetLastRBE() const { return fLastRBE; }
+		const std::vector<double>& GetLastRBEVariance() const { return fLastRBEVariance; }
 		
 		// TO DO: LQ/linear fit functions
 		vector<double> logTransform(const vector<double>& S);
@@ -96,10 +105,15 @@ class TsGetSurvivalRBEQualityFactor
 		void SetGSM2_ion 	(const string& name) { GSM2_ion 	= name; }
 		void SetGSM2_LET 	(double num) { GSM2_LET 	= num; }
 		void SetBioWeightFunctionDataFile(string fileName ){ BioWeightFunctionDataFile= fileName; }
+		void SetOutputDirectory(const string& directory) { fOutputDirectory = directory; }
+		void SetOutputPrefix(const string& prefix) { fOutputPrefix = prefix; }
 
 		//MultieventIterations
 		void SetMCMultieventIterations (int num) { MCMultieventIterations = num; }
 	private:
+		void InitializeDefaultParameters();
+		double GetYBinCenter(int index) const;
+		string GetOutputPath(const string& filename) const;
 		
 		bool fGetStatitisticInfo;
 		int  fSpectrumUpdateTimes;
@@ -122,6 +136,12 @@ class TsGetSurvivalRBEQualityFactor
 		double  yD_var;
 		std::vector<double> fy_var;
 		std::vector<double> dy_var;
+		std::vector<double> fOwnedBinLimit;
+		std::vector<double> fOwnedBinWidth;
+		std::vector<double> fOwnedBinCenter;
+		std::vector<double> fOwnedFy;
+		std::vector<double> fOwnedDy;
+		std::string fSpectrumSourceName;
 
 		int fSpecLength;
 		std::vector<double> Doses;
@@ -131,6 +151,14 @@ class TsGetSurvivalRBEQualityFactor
 		string GSM2_ion;
 
 		string BioWeightFunctionDataFile;
+		string fOutputDirectory;
+		string fOutputPrefix;
+		string fLastModelName;
+		std::vector<double> fLastDoses;
+		std::vector<double> fLastSurvival;
+		std::vector<double> fLastSurvivalVariance;
+		std::vector<double> fLastRBE;
+		std::vector<double> fLastRBEVariance;
 
 };
 

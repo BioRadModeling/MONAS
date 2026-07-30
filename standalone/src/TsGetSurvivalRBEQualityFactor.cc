@@ -29,14 +29,72 @@
 #include <cmath>
 #include <thread>
 #include <chrono>
+#include <stdexcept>
 
 // GSL library
 #include <gsl/gsl_multifit.h>
 
 using namespace std;
 
+namespace {
+
+double FiniteStdDev(double variance)
+{
+	const double stddev = sqrt(variance);
+	return std::isfinite(stddev) ? stddev : 0.0;
+}
+
+} // namespace
+
 TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
 	:fyParticleContribution(yParticleContribution), fyVector(yVector),fyVector_Particle(yVector_Particle), fyVector_Nucleus(yVector_Nucleus), fyVector_Particle_Nucleus(yVector_Particle_Nucleus), fBinLimit(hBinLimit), fBinWidth(hBinWidth), fhfy(hfy), fhdy(hdy), yF(hyF), yD(hyD), yF_var(hyF_var), yD_var(hyD_var), fy_var(hfy_var), dy_var(hdy_var),fSpecLength(SpecLength), fGetStatitisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetParticleContribution(GetParticleContribution)
+{
+	InitializeDefaultParameters();
+};
+
+TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(const TsBinnedSpectrum& spectrum)
+	:fGetStatitisticInfo(false), fSpectrumUpdateTimes(1), fGetParticleContribution(false), MCMultieventIterations(1e5), fBinLimit(0), fBinWidth(0), fhy(0), fhfy(0), fhdy(0), fhydy(0), yF(spectrum.yF), yF_var(0.0), yD(spectrum.yD), yD_var(0.0), fSpectrumSourceName(spectrum.SourceName), fSpecLength(0)
+{
+	if(spectrum.YCenter.empty())
+		throw std::runtime_error("Cannot build MKM calculator from an empty binned spectrum.");
+	if(spectrum.YCenter.size() != spectrum.BinWidth.size() ||
+	   spectrum.YCenter.size() != spectrum.FrequencyDensity.size() ||
+	   spectrum.YCenter.size() != spectrum.DoseDensity.size())
+	{
+		throw std::runtime_error("Cannot build MKM calculator from a binned spectrum with mismatched vector sizes.");
+	}
+
+	fOwnedBinCenter = spectrum.YCenter;
+	fOwnedBinWidth = spectrum.BinWidth;
+	fOwnedFy = spectrum.FrequencyDensity;
+	fOwnedDy = spectrum.DoseDensity;
+	fOwnedBinLimit.resize(spectrum.YCenter.size() + 1, 0.0);
+	for(std::size_t i = 0; i < spectrum.YCenter.size(); ++i)
+	{
+		if(!(spectrum.YCenter[i] > 0.0) || !(spectrum.BinWidth[i] > 0.0))
+			throw std::runtime_error("Cannot build MKM calculator from non-positive y centers or bin widths.");
+		const double lower = spectrum.YCenter[i] - 0.5 * spectrum.BinWidth[i];
+		const double upper = spectrum.YCenter[i] + 0.5 * spectrum.BinWidth[i];
+		if(i == 0)
+			fOwnedBinLimit[i] = lower > 0.0 ? lower : 0.0;
+		fOwnedBinLimit[i + 1] = upper;
+	}
+
+	fBinLimit = &fOwnedBinLimit[0];
+	fBinWidth = &fOwnedBinWidth[0];
+	fhfy = &fOwnedFy[0];
+	fhdy = &fOwnedDy[0];
+	fy_var.resize(fOwnedFy.size(), 0.0);
+	dy_var.resize(fOwnedDy.size(), 0.0);
+	fyParticleContribution.resize(fOwnedFy.size(), std::vector<double>(10, 0.0));
+	for(std::size_t i = 0; i < fyParticleContribution.size(); ++i)
+		fyParticleContribution[i][9] = 1.0;
+	fSpecLength = static_cast<int>(fOwnedFy.size()) + 1;
+
+	InitializeDefaultParameters();
+};
+
+void TsGetSurvivalRBEQualityFactor::InitializeDefaultParameters()
 {
 	// default values of MK model
 	// 10% cell survival relative to 200 kVp X-rays for HSG cells
@@ -76,8 +134,28 @@ TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::ve
 	//MultiEventIterations
 	MCMultieventIterations = 1e5;
 	BioWeightFunctionDataFile = "BioWeightFuncData_interpolation.txt";
+	fOutputDirectory = "";
+	fOutputPrefix = "";
 
-};
+}
+
+double TsGetSurvivalRBEQualityFactor::GetYBinCenter(int index) const
+{
+	if(!fOwnedBinCenter.empty())
+		return fOwnedBinCenter[index];
+	return (fBinLimit[index]+fBinLimit[index+1])/2;
+}
+
+string TsGetSurvivalRBEQualityFactor::GetOutputPath(const string& filename) const
+{
+	string outputName = fOutputPrefix + filename;
+	if(fOutputDirectory.empty() || fOutputDirectory == ".")
+		return outputName;
+	const char lastChar = fOutputDirectory[fOutputDirectory.size() - 1];
+	if(lastChar == '/' || lastChar == '\\')
+		return fOutputDirectory + outputName;
+	return fOutputDirectory + "/" + outputName;
+}
 
 TsGetSurvivalRBEQualityFactor::~TsGetSurvivalRBEQualityFactor()
 {};
@@ -104,7 +182,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SaturationCorr()
 
 	for(int i=0; i<fSpecLength-1;i++) 
 	{
-		double yi = (fBinLimit[i]+fBinLimit[i+1])/2;  
+		double yi = GetYBinCenter(i);  
 		Integrate_y += (1-exp(-pow(yi,2)/pow(y0,2)))*fhfy[i]*fBinWidth[i];
 
 		for(int comp=0; comp<Ncomponents; comp++)
@@ -144,7 +222,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SaturationCorr()
 
 	for(int i=0; i<fSpecLength-1;i++) 
 	{    
-		double yi = (fBinLimit[i]+fBinLimit[i+1])/2;     
+		double yi = GetYBinCenter(i);     
 		double aa = (1-exp(-pow(yi,2)/pow(y0,2)));
 		ystar_var += pow(y0*y0*aa*fBinWidth[i]/yF,2)*fy_var[i] +pow(y0*y0*aa*fhfy[i]*fBinWidth[i]/(yF*yF),2)*yF_var;
 	}
@@ -160,7 +238,8 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SaturationCorr()
 
 	}
 
-	WriteMKMSurvival("MKModel_StaurationCorrected.csv", Doses, S, S_var, RBE, RBE_var);
+	const string outputFile = fSpectrumSourceName.empty() ? "MKModel_StaurationCorrected.csv" : "MKM_SaturationCorrected.csv";
+	WriteMKMSurvival(outputFile, Doses, S, S_var, RBE, RBE_var);
 
 	std::cout<<"************************************ Get RBE with MK method - Saturation Corrected ***************************"<<std::endl;
 	std::cout<<"Doses\tSurvival\tRBE\n";
@@ -170,7 +249,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SaturationCorr()
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<S[i];
 		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(S_var[i])<<")\t" <<'\t';
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<RBE[i];
-		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(RBE_var[i])<<")" << '\t' <<std::endl;
+		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< FiniteStdDev(RBE_var[i])<<")" << '\t' <<std::endl;
 	}
 
 	std::cout<<"\nSpectrum Parameters:"<<endl;
@@ -236,7 +315,8 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_nonPoissonCorr()
 
 	}
 
-	WriteMKMSurvival("MKModel_nonPoisson.csv", Doses, S, S_var, RBE, RBE_var);
+	const string outputFile = fSpectrumSourceName.empty() ? "MKModel_nonPoisson.csv" : "MKM_nonPoisson.csv";
+	WriteMKMSurvival(outputFile, Doses, S, S_var, RBE, RBE_var);
 
 	std::cout<<"************************************ Get RBE with MK method - non-Poisson ***************************"<<std::endl;
 	std::cout<<"Doses\tSurvival\tRBE\n";
@@ -246,7 +326,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_nonPoissonCorr()
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<S[i];
 		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(S_var[i])<<")\t";
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<RBE[i];
-		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(RBE_var[i])<<" )"<<std::endl;
+		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< FiniteStdDev(RBE_var[i])<<" )"<<std::endl;
 	}
 
 	std::cout<<"\nSpectrum Parameters:"<<endl;
@@ -281,7 +361,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SplitDoseIrradiation()
 	double Integrate_y = 0; 
 	for(int i=0; i<fSpecLength-1;i++) 
 	{
-		double yi = (fBinLimit[i]+fBinLimit[i+1])/2;  
+		double yi = GetYBinCenter(i);  
 		Integrate_y += (1-exp(-pow(yi,2)/pow(y0,2)))*fhfy[i]*fBinWidth[i];
 	}
 	double y_star = y0*y0*Integrate_y/yF;  // Unit:keV/um
@@ -388,6 +468,9 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithMKModel_SplitDoseIrradiation()
 
 void TsGetSurvivalRBEQualityFactor::GetSurvWithDSMKModel()
 {
+	if(!fOwnedBinCenter.empty())
+		throw std::runtime_error("DSMKM is not available for deterministic binned-spectrum input yet.");
+
 	//Set parameters
 	double alpha0 = MKModel_alpha0; // Unit:Gy-1
 	double alphaX = MKModel_alphaX; // Unit:Gy-1
@@ -508,7 +591,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithDSMKModel()
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<S[i]; 
 		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(S_var[i])<<")\t";
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<RBE[i];
-		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(RBE_var[i])<<")"<<std::endl;
+		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< FiniteStdDev(RBE_var[i])<<")"<<std::endl;
 	}
 
 	cout<<"Default parameters:"<<endl;
@@ -541,7 +624,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithSMKModel()
 	double Integrate_y = 0;
 	for(int i=0; i<fSpecLength-1;i++) 
 	{
-		double yi = (fBinLimit[i]+fBinLimit[i+1])/2;  
+		double yi = GetYBinCenter(i);  
 		Integrate_y += (1-exp(-pow(yi,2)/pow(y0,2)))*fhfy[i]*fBinWidth[i];	
 	}
 	double y_star = y0*y0*Integrate_y/yF;  // Unit:keV/um
@@ -569,9 +652,6 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithSMKModel()
 		if(D>0) 
 			rbe = (sqrt( (alphaX*alphaX) - (4*betaX*log(s)) ) - alphaX)/(2*betaX*D); 
 
-
-		cout << alphaX << ' ' <<betaX << ' ' << s << ' ' <<rbe << endl;
-
 		S.push_back(s);
 		RBE.push_back(rbe);
 
@@ -588,7 +668,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithSMKModel()
 
 	for(int i=0; i<fSpecLength-1;i++) 
 	{    
-		double yi = (fBinLimit[i]+fBinLimit[i+1])/2;     
+		double yi = GetYBinCenter(i);     
 		double aa = (1-exp(-pow(yi,2)/pow(y0,2)));
 		ystar_var += pow(y0*y0*aa*fBinWidth[i]/yF,2)*fy_var[i] +pow(y0*y0*aa*fhfy[i]*fBinWidth[i]/(yF*yF),2)*yF_var;
 	}
@@ -609,7 +689,8 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithSMKModel()
 
 	}
 
-	WriteMKMSurvival("MKModel_SMKM.csv", Doses, S, S_var, RBE, RBE_var);
+	const string outputFile = fSpectrumSourceName.empty() ? "MKModel_SMKM.csv" : "SMKM.csv";
+	WriteMKMSurvival(outputFile, Doses, S, S_var, RBE, RBE_var);
 	std::cout<<"************************************ Get RBE with MK method - SMKModel ***************************"<<std::endl;
 	std::cout<<"Doses\tSurvival\tRBE\n";
 	for(int i=0; i<Doses.size(); i++)
@@ -618,7 +699,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithSMKModel()
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<S[i];
 		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(S_var[i])<<")\t";
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<RBE[i];
-		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(RBE_var[i])<<")\t"<<std::endl;
+		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< FiniteStdDev(RBE_var[i])<<")\t"<<std::endl;
 	}
 
 	std::cout<<"\nSpectrum Parameters:"<<endl;
@@ -720,7 +801,7 @@ void TsGetSurvivalRBEQualityFactor::GetQualityFactorWithICRU40()
 	std::vector<double> QComponents_var(Ncomponents, 0.);
 	for(int i=0; i<fSpecLength-1; i++)
 	{
-		double yBinCenter = (fBinLimit[i+1] + fBinLimit[i])/2.;
+		double yBinCenter = GetYBinCenter(i);
 		double qy = ( 5510. / yBinCenter )*( 1 - exp(-(5e-5*yBinCenter*yBinCenter) - (2e-7*yBinCenter*yBinCenter*yBinCenter) ) );
 		Q += qy*fhdy[i]*fBinWidth[i];
 		Q_var += pow(qy*fBinWidth[i], 2)*dy_var[i];
@@ -759,7 +840,7 @@ void TsGetSurvivalRBEQualityFactor::GetQualityFactorWithKellereHahn()
 	std::vector<double> QComponents_var(Ncomponents, 0.);
 	for(int i=0; i<fSpecLength-1; i++)
 	{
-		double yBinCenter = (fBinLimit[i+1] + fBinLimit[i])/2.;
+		double yBinCenter = GetYBinCenter(i);
 		double qy = 0.3* yBinCenter*pow(1+pow(yBinCenter/137.,5),-0.4);
 
 		Q += qy*fhdy[i]*fBinWidth[i];
@@ -785,6 +866,8 @@ void TsGetSurvivalRBEQualityFactor::GetQualityFactorWithKellereHahn()
 
 void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 {
+	if(!fOwnedBinCenter.empty())
+		throw std::runtime_error("GSM2 is not available for deterministic binned-spectrum input yet.");
 
 	double alphaX = GSM2_alphaX;
 	double betaX = GSM2_betaX;
@@ -975,7 +1058,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<S[i];
 		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(S_var[i])<<")\t" << S_Particle[i][9] << '\t';
 		std::cout<<setiosflags(ios::fixed)<<setprecision(4)<<RBE[i];
-		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< sqrt(RBE_var[i])<<")\t" << RBE_Particle[i][9]<<std::endl;
+		std::cout<<setiosflags(ios::fixed)<<setprecision(6)<<" ("<< FiniteStdDev(RBE_var[i])<<")\t" << RBE_Particle[i][9]<<std::endl;
 	}
 	std::cout<<"Default parameters:"<<endl;
 	std::cout<<"1.The reference radiation is X-ray(200 kVp) with alpha = 0.19 Gy-1 and beta = 0.05 Gy-2"<<std::endl;
@@ -993,7 +1076,24 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 
 void TsGetSurvivalRBEQualityFactor::WriteMKMSurvival(string filename, std::vector<double> D, std::vector<double> S, std::vector<double> Svar, std::vector<double> RBE, std::vector<double> RBEvar)
 {
-	std::ofstream output(filename);
+	if(filename.find("SaturationCorrected") != string::npos || filename.find("StaurationCorrected") != string::npos)
+		fLastModelName = "MKM_SaturationCorrected";
+	else if(filename.find("nonPoisson") != string::npos)
+		fLastModelName = "MKM_nonPoisson";
+	else if(filename.find("SMKM") != string::npos)
+		fLastModelName = "SMKM";
+	else if(filename.find("DSMKM") != string::npos)
+		fLastModelName = "DSMKM";
+	else
+		fLastModelName = filename;
+	fLastDoses = D;
+	fLastSurvival = S;
+	fLastSurvivalVariance = Svar;
+	fLastRBE = RBE;
+	fLastRBEVariance = RBEvar;
+
+	const string outputPath = GetOutputPath(filename);
+	std::ofstream output(outputPath);
 	output << "# MKM Parameters\n#\n";
 	output << "# Alpha0 = " << MKModel_alpha0 << " Gy-1\n"
 		<< "# Beta = " << MKModel_beta << " Gy-2\n"
@@ -1004,16 +1104,17 @@ void TsGetSurvivalRBEQualityFactor::WriteMKMSurvival(string filename, std::vecto
 
 	output << "# Dose[Gy], Survival, SurvivalStd, RBE, RBEStd\n";
 	for(int i=0; i<D.size(); i++)
-		output << std::fixed << std::setprecision(7) << D[i] << ", " << S[i] << ", " << sqrt(Svar[i]) << ", " << RBE[i] << ", " << sqrt(RBEvar[i]) << endl;
+		output << std::fixed << std::setprecision(7) << D[i] << ", " << S[i] << ", " << FiniteStdDev(Svar[i]) << ", " << RBE[i] << ", " << FiniteStdDev(RBEvar[i]) << endl;
 
 	output.close();
-	std::cout << "Output file " << filename << " written!" <<std::endl;
+	std::cout << "Output file " << outputPath << " written!" <<std::endl;
 
 }
 
 void TsGetSurvivalRBEQualityFactor::WriteGSM2Survival(string filename, std::vector<double> D, std::vector<double> S, std::vector<double> Svar, std::vector<double> RBE, std::vector<double> RBEvar)
 {
-	std::ofstream output(filename);
+	const string outputPath = GetOutputPath(filename);
+	std::ofstream output(outputPath);
 	output << "# GSM2 Parameters\n#\n";
 	output << "# kappa = " << GSM2_kappa << " Gy-1\n"
 		<< "# lambda = " << GSM2_lambda << " Gy-1\n"
@@ -1031,7 +1132,7 @@ void TsGetSurvivalRBEQualityFactor::WriteGSM2Survival(string filename, std::vect
 		output << std::fixed << std::setprecision(7) << D[i] << ", " << S[i] << ", " << sqrt(Svar[i]) << ", " << RBE[i] << ", " << sqrt(RBEvar[i]) << endl;
 
 	output.close();
-	std::cout << "Output file " << filename << " written!" <<std::endl;
+	std::cout << "Output file " << outputPath << " written!" <<std::endl;
 
 
 
@@ -1040,7 +1141,7 @@ void TsGetSurvivalRBEQualityFactor::WriteGSM2Survival(string filename, std::vect
 
 void TsGetSurvivalRBEQualityFactor::WriteSurvivivalRBEParticleContribution(string filename, std::vector<double> D, std::vector<std::vector<double>> Vector_Particle)
 {
-	std::ofstream outputParticle(filename);
+	std::ofstream outputParticle(GetOutputPath(filename));
 
 	outputParticle << "D(Gy)    e-       Hprim    Hsec    He      Li      Be      B        C       Other    Total[Survival]\n";
 
@@ -1061,7 +1162,7 @@ void TsGetSurvivalRBEQualityFactor::WriteQParticleContribution(string filename, 
 {
 
 	cout <<"NOT GOOD"<< endl;
-	std::ofstream outputParticle(filename);
+	std::ofstream outputParticle(GetOutputPath(filename));
 
 	outputParticle << "e-       Hprim    Hsec    He      Li      Be      B        C       Other    Total[Q]\n"; 
 	for(int loop=0; loop<10; loop++)
@@ -1211,12 +1312,13 @@ double TsGetSurvivalRBEQualityFactor::calculateDose(double alpha, double beta, d
 
 void TsGetSurvivalRBEQualityFactor::Write_yD_RBE10(string filename, double yD, double Dose10, double RBE10)
 {
+	const string outputPath = GetOutputPath(filename);
 	// Check if file exists
-	std::ifstream infile(filename);
+	std::ifstream infile(outputPath);
 	bool exists = infile.good();
 	infile.close();
 	    
-	std::ofstream output(filename, std::ios::app); // Append mode
+	std::ofstream output(outputPath, std::ios::app); // Append mode
 	    
 	if (!exists) {
 		output << "# GSM2 Parameters\n#\n";

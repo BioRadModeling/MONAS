@@ -586,7 +586,11 @@ int main(int argc, char* argv[]) {
             std::cout << "Protons found: " << summary.protonCount << "\n";
             std::cout << "Total proton weight: " << summary.totalProtonWeight << "\n";
             std::cout << "y_F [keV/um]: " << summary.yFKeVPerUm << "\n";
+            std::cout << "y_F LUT max error [keV/um]: "
+                      << summary.yFMaxErrorKeVPerUm << "\n";
             std::cout << "y_D [keV/um]: " << summary.yDKeVPerUm << "\n";
+            std::cout << "y_D LUT max error [keV/um]: "
+                      << summary.yDMaxErrorKeVPerUm << "\n";
             std::cout << "y* [keV/um]: " << summary.yStarKeVPerUm << "\n";
             std::cout << "Magini summary CSV: " << summaryCsv << "\n";
             return 0;

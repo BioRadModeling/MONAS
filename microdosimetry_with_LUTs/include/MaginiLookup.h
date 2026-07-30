@@ -9,12 +9,16 @@ struct MaginiRow {
     double yFLutKeVPerUm{0.0};
     double yStarLutKeVPerUm{0.0};
     double yDLutKeVPerUm{0.0};
+    double yFMaxErrorKeVPerUm{0.0};
+    double yDMaxErrorKeVPerUm{0.0};
 };
 
 struct MaginiInterpolatedValues {
     double yFLutKeVPerUm{0.0};
     double yStarLutKeVPerUm{0.0};
     double yDLutKeVPerUm{0.0};
+    double yFMaxErrorKeVPerUm{0.0};
+    double yDMaxErrorKeVPerUm{0.0};
     double lowerEnergyMeV{0.0};
     double upperEnergyMeV{0.0};
     double lowerWeight{1.0};

@@ -12,6 +12,8 @@ struct MaginiSummary {
     double yFKeVPerUm{0.0};
     double yDKeVPerUm{0.0};
     double yStarKeVPerUm{0.0};
+    double yFMaxErrorKeVPerUm{0.0};
+    double yDMaxErrorKeVPerUm{0.0};
     double yDWeightedNumerator{0.0};
     double yStarWeightedNumerator{0.0};
 };

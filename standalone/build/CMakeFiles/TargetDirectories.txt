@@ -1,0 +1,3 @@
+/Users/kylediamond/MONAS/standalone/build/CMakeFiles/monas.dir
+/Users/kylediamond/MONAS/standalone/build/CMakeFiles/edit_cache.dir
+/Users/kylediamond/MONAS/standalone/build/CMakeFiles/rebuild_cache.dir

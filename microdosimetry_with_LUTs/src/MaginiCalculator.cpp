@@ -1,5 +1,6 @@
 #include "MaginiCalculator.h"
 
+#include <cmath>
 #include <stdexcept>
 
 MaginiSummary MaginiCalculator::calculate(
@@ -37,6 +38,8 @@ MaginiSummary MaginiCalculator::calculate(
         const MaginiInterpolatedValues lut = lookup.interpolate(proton.energyMeV);
 
         summary.yFKeVPerUm += lut.yFLutKeVPerUm * normalizedWeight;
+        summary.yFMaxErrorKeVPerUm +=
+            lut.yFMaxErrorKeVPerUm * normalizedWeight;
         summary.yDWeightedNumerator +=
             lut.yDLutKeVPerUm * lut.yFLutKeVPerUm * normalizedWeight;
         summary.yStarWeightedNumerator +=
@@ -50,6 +53,20 @@ MaginiSummary MaginiCalculator::calculate(
 
     summary.yDKeVPerUm = summary.yDWeightedNumerator / summary.yFKeVPerUm;
     summary.yStarKeVPerUm = summary.yStarWeightedNumerator / summary.yFKeVPerUm;
+
+    for (const auto& proton : protons) {
+        const double normalizedWeight = proton.weight / summary.totalProtonWeight;
+        const MaginiInterpolatedValues lut = lookup.interpolate(proton.energyMeV);
+
+        summary.yDMaxErrorKeVPerUm +=
+            std::abs(normalizedWeight * lut.yFLutKeVPerUm /
+                     summary.yFKeVPerUm) *
+                lut.yDMaxErrorKeVPerUm +
+            std::abs(normalizedWeight *
+                     (lut.yDLutKeVPerUm - summary.yDKeVPerUm) /
+                     summary.yFKeVPerUm) *
+                lut.yFMaxErrorKeVPerUm;
+    }
 
     return summary;
 }

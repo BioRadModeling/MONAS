@@ -128,6 +128,8 @@ void CsvWriter::writeMaginiSummary(const std::filesystem::path& outPath,
 
     out << "proton_count,total_proton_weight,"
         << "y_F_keV_per_um,y_D_keV_per_um,y_star_keV_per_um,"
+        << "y_F_lut_error_max_keV_per_um,"
+        << "y_D_lut_error_max_keV_per_um,"
         << "y_D_weighted_numerator,y_star_weighted_numerator\n";
 
     out << summary.protonCount << ','
@@ -135,6 +137,8 @@ void CsvWriter::writeMaginiSummary(const std::filesystem::path& outPath,
         << summary.yFKeVPerUm << ','
         << summary.yDKeVPerUm << ','
         << summary.yStarKeVPerUm << ','
+        << summary.yFMaxErrorKeVPerUm << ','
+        << summary.yDMaxErrorKeVPerUm << ','
         << summary.yDWeightedNumerator << ','
         << summary.yStarWeightedNumerator << '\n';
 }
