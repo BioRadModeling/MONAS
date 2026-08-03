@@ -2,3 +2,6 @@
 .vscode/
 __pycache__/
 *.py[cod]
+
+# Private Magini lookup-table payloads.
+microdosimetry_with_LUTs/lookup_tables/Magini/
