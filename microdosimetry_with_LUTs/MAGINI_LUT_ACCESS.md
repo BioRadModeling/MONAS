@@ -64,19 +64,6 @@ This command checks out the private Magini-LUTs repository directly as:
 
 microdosimetry_with_LUTs/lookup_tables/Magini/
 
-After cloning, the directory structure should look like:
-
-MONAS/
-└── microdosimetry_with_LUTs/
-    └── lookup_tables/
-        └── Magini/
-            ├── .git/
-            ├── Magini.csv
-            ├── 0.00102.csv
-            ├── 0.00107.csv
-            ├── ...
-            └── <additional LUT files>
-
 The .git/ directory inside Magini/ belongs to the separate private Magini-LUTs repository. The Magini LUT files are therefore not tracked as part of the public MONAS repository.
 
 You can verify the installation with:
