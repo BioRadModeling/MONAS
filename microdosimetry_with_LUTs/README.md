@@ -336,6 +336,14 @@ If a group has no contributing particles, its values are written as `nan`.
 
 ## Magini total mean calculations
 
+### Magini lookup tables
+
+The Magini lookup tables are distributed separately from MONAS and require
+authorization before use.
+
+See [MAGINI_LUT_ACCESS.md](MAGINI_LUT_ACCESS.md) for instructions on
+requesting access and installing the LUTs.
+
 The `Magini` mode computes the total proton mean quantities `y_F`, `y_D`, and
 `y*` from one phase-space file using the Magini lookup table:
 
