@@ -19,3 +19,141 @@ Your GitHub username is required because access to the Magini lookup tables is g
 Once your request has been reviewed and approved, the GitHub account provided in your request will be granted access to the private Magini LUT repository.
 
 After access has been granted, continue with the installation instructions below to check out a local copy of the Magini lookup tables in the directory expected by MONAS.
+
+## 2. Verify GitHub access
+
+Before installing the lookup tables, make sure GitHub authentication is configured on your computer.
+
+If you use SSH authentication, you can verify which GitHub account is being used with:
+
+ssh -T git@github.com
+
+A successful response will look similar to:
+
+Hi YOUR_GITHUB_USERNAME! You've successfully authenticated, but GitHub does not provide shell access.
+
+Make sure that the GitHub username shown is the same account that was granted access to the private Magini LUT repository.
+
+If the wrong GitHub account is displayed, update your SSH configuration or use the credentials associated with the GitHub account that was granted access.
+
+## 3. Clone MONAS
+
+If you have not already cloned MONAS:
+
+git clone https://github.com/BioRadModeling/MONAS.git
+cd MONAS
+
+Check out the appropriate MONAS branch if necessary:
+
+git switch feature_microdosimetry_from_LUTs
+
+## 4. Install the Magini LUTs
+
+The private Magini LUT repository is currently hosted at:
+
+github.com/dqtranPhysics/Magini-LUTs
+
+The repository should be cloned directly into the location expected by MONAS.
+
+From the root directory of your MONAS repository, run:
+
+git clone git@github.com:dqtranPhysics/Magini-LUTs.git \
+    microdosimetry_with_LUTs/lookup_tables/Magini
+
+This command checks out the private Magini-LUTs repository directly as:
+
+microdosimetry_with_LUTs/lookup_tables/Magini/
+
+After cloning, the directory structure should look like:
+
+MONAS/
+└── microdosimetry_with_LUTs/
+    └── lookup_tables/
+        └── Magini/
+            ├── .git/
+            ├── Magini.csv
+            ├── 0.00102.csv
+            ├── 0.00107.csv
+            ├── ...
+            └── <additional LUT files>
+
+The .git/ directory inside Magini/ belongs to the separate private Magini-LUTs repository. The Magini LUT files are therefore not tracked as part of the public MONAS repository.
+
+You can verify the installation with:
+
+ls microdosimetry_with_LUTs/lookup_tables/Magini
+
+You can also verify that the main lookup table exists with:
+
+test -f microdosimetry_with_LUTs/lookup_tables/Magini/Magini.csv \
+    && echo "Magini LUTs successfully installed"
+
+If the installation was successful, you should see:
+
+Magini LUTs successfully installed
+
+## 5. Access denied or repository not found
+
+If you receive an error such as:
+
+ERROR: Repository not found.
+fatal: Could not read from remote repository.
+
+verify the following:
+
+Your request for Magini LUT access has been approved.
+The GitHub account you provided in your access request has been granted access to dqtranPhysics/Magini-LUTs.
+You are authenticated on your computer using that same GitHub account.
+The repository URL is entered correctly.
+
+For SSH users, check which GitHub account is currently authenticated with:
+
+ssh -T git@github.com
+
+For example:
+
+Hi exampleUser! You've successfully authenticated, but GitHub does not provide shell access.
+
+The username displayed by GitHub should match the GitHub account that was granted Magini LUT access.
+
+If you have multiple GitHub accounts configured on the same computer, you may need to configure separate SSH keys or SSH host aliases so that Git uses the correct account.
+
+## 6. Updating the Magini LUTs
+
+The installed Magini directory is a separate Git repository. If updated lookup tables are released, they can be retrieved without recloning MONAS.
+
+From the MONAS root directory, run:
+
+cd microdosimetry_with_LUTs/lookup_tables/Magini
+git pull
+
+This retrieves the latest authorized version of the Magini LUT repository.
+
+You can then return to the MONAS root directory with:
+
+cd ../../..
+
+## 7. Removing and reinstalling the Magini LUTs
+
+If you need to reinstall the Magini lookup tables, remove the local Magini directory:
+
+rm -rf microdosimetry_with_LUTs/lookup_tables/Magini
+
+Then clone the private repository again:
+
+git clone git@github.com:dqtranPhysics/Magini-LUTs.git \
+    microdosimetry_with_LUTs/lookup_tables/Magini
+
+Be careful when using rm -rf and make sure you are removing only the intended Magini directory.
+
+## Important
+
+The Magini lookup tables are not part of the public MONAS repository and should not be committed to, redistributed through, or otherwise incorporated into the public MONAS source repository.
+
+The public MONAS repository contains the software required to use the Magini method, while the lookup-table data themselves are distributed separately through the private:
+
+dqtranPhysics/Magini-LUTs
+
+repository.
+
+Access to the private Magini LUT repository is intended only for authorized users. Please do not redistribute the lookup-table files or provide repository access to other users. Individuals who wish to use the Magini LUTs should request access through the procedure described above.
