@@ -88,10 +88,10 @@ fatal: Could not read from remote repository.
 
 verify the following:
 
-Your request for Magini LUT access has been approved.
-The GitHub account you provided in your access request has been granted access to dqtranPhysics/Magini-LUTs.
-You are authenticated on your computer using that same GitHub account.
-The repository URL is entered correctly.
+- Your request for Magini LUT access has been approved.
+- The GitHub account you provided in your access request has been granted access to dqtranPhysics/Magini-LUTs.
+- You are authenticated on your computer using that same GitHub account.
+- The repository URL is entered correctly.
 
 For SSH users, check which GitHub account is currently authenticated with:
 
