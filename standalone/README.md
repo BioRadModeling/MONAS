@@ -34,7 +34,7 @@ Example GSM2 (-CellLine requires "-H460" or "-H1437", otherwise no specific cell
 
 ### Deterministic binned-spectrum MKM mode
 
-Use `-MKMFromSpectra` when the input is already a binned lineal-energy spectrum instead of event-by-event phase-space samples. This mode does not sample synthetic events. It reads each bin directly and can run `-MKMSatCorr`, `-MKMnonPoiss`, and/or `-SMKM` for one or more spectra in the same command.
+Use `-MKMFromSpectra` when the input is already a binned lineal-energy spectrum instead of event-by-event phase-space samples. This mode reads each bin directly and can run `-MKMSatCorr`, `-MKMnonPoiss`, `-SMKM`, and/or `-GSM2` for one or more spectra in the same command.
 
 Input spectrum formats:
 
@@ -73,7 +73,28 @@ Example multi-source comparison:
   -Doses 0 10 1
 ```
 
-A minimal smoke example is available in `examples/run_binned_spectrum_smoke.sh`. It runs the DeCunha-style generic CSV, AMF, and TOPAS fixture spectra together and checks that the expected output files are created.
+Example GSM2 binned-spectrum run:
+
+```
+./bin/monas -MKMFromSpectra -outputDir results/gsm2_spectra \
+  -spectrum DeCunha:poly:decunha_spectrum.csv \
+  -GSM2 \
+  -fSetMultieventStatistic 10000 \
+  -GSM2_rDomain 0.42 -GSM2_rNucleus 6.0 \
+  -GSM2_alphaX 0.19 -GSM2_betaX 0.05 \
+  -GSM2_a 0.1 -GSM2_b 0.1 -GSM2_r 0.1 \
+  -Doses 0 10 1
+```
+
+In binned-spectrum GSM2 mode, MONAS converts the input frequency spectrum `f(y)` to a specific-energy spectrum using:
+
+```
+z [Gy] = 0.204 * y [keV/um] / (2*r_det [um])^2
+```
+
+This conversion is valid for spherical targets only. Different detector or target geometries require the corresponding geometry-specific conversion from lineal energy to specific energy. After changing variables from `y` to `z`, MONAS normalizes the converted `f(z)` with bin widths and samples the cumulative dose-weighted single-event distribution `z*f(z)` through the same GSM2 damage workflow used by event-derived spectra. Particle-contribution outputs are not available from binned spectra because the input histogram does not retain particle identity.
+
+A minimal smoke example is available in `examples/run_binned_spectrum_smoke.sh`. It runs the DeCunha-style generic CSV, AMF, and TOPAS fixture spectra together and checks that the expected output files are created. A GSM2-specific binned-spectrum smoke example is available in `examples/run_binned_gsm2_smoke.sh`.
 
 ## HELP FOR INPUT PARAMETERS
 ```

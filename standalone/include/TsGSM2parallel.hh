@@ -32,6 +32,7 @@
 
 #include "TsSpecificEnergy.hh"
 #include "TsLinealEnergy.hh"
+#include "TsBinnedSpectrum.hh"
 
 //#include "globals.hh"
 //#include "G4RandomDirection.hh"
@@ -59,6 +60,16 @@ class TsGSM2
 			std::vector<double> yVector_Nucleus, 
 			std::vector<std::vector<double>> yVector_Particle_Nucleus, 
 			bool GetStatisticInfo, 
+			int SpectrumUpdateTimes);
+		TsGSM2(	const TsBinnedSpectrum& spectrum,
+			double Rd,
+			double Rc,
+			double kinA,
+			double kinB,
+			double kinR,
+			string ion,
+			double LET,
+			bool GetStatisticInfo,
 			int SpectrumUpdateTimes);
 		~TsGSM2();
 

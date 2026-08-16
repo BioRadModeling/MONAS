@@ -51,7 +51,8 @@ TsGSM2::TsGSM2(double yF, double yD, double Rd, double Rc, double kinA, double k
 	ySpectra_F = new TsLinealEnergy(fyVector_Nucleus,fyVector_Particle_Nucleus); // This is changed into a private variable in order to use it everywhere in the class
 	
 	// INSERT THE INFO FROM THE DOMAIN SPECTRUM (domain-size scoring volume, R = 0.8um)
-	// Rescaling factor: y2z_factor = 0.16/(pi*rho*fRadius*fRadius) in TsSpecificEnergy.cc
+	// Spherical-target conversion in TsSpecificEnergy.cc:
+	// z [Gy] = 0.204*y [keV/um]/(2*r [um])^2
 	TsSpecificEnergy* zSpectra_D = new TsSpecificEnergy(fyVector_Particle, GSM2Model_rd, fGetStatisticInfo, fSpectrumUpdateTimes);
 	fSpecificEnergy_D = zSpectra_D;
 
@@ -65,7 +66,8 @@ TsGSM2::TsGSM2(double yF, double yD, double Rd, double Rc, double kinA, double k
 	hzfz_cumulative_D = fSpecificEnergy_D->GetHzfzCumulative();
 	
 	// INSERT THE INFO FROM THE NUCLEUS SPECTRUM (nucleus-size scoring volume, R = 8um)
-	// Rescaling factor: y2z_factor = 0.16/(pi*rho*fRadius*fRadius) in TsSpecificEnergy.cc
+	// Spherical-target conversion in TsSpecificEnergy.cc:
+	// z [Gy] = 0.204*y [keV/um]/(2*r [um])^2
 	TsSpecificEnergy* zSpectra_C = new TsSpecificEnergy(fyVector_Particle_Nucleus, GSM2Model_rc, fGetStatisticInfo, fSpectrumUpdateTimes);
 	fSpecificEnergy_C = zSpectra_C;
 	zF_C = fSpecificEnergy_C->GetzF();
@@ -87,6 +89,41 @@ TsGSM2::TsGSM2(double yF, double yD, double Rd, double Rc, double kinA, double k
 	GSM2Model_lambda = GSM2Model_kappa*1e-3;
 
 	cout << "************** GSM2 **************\n"
+		<< "Kappa: " << GSM2Model_kappa <<endl
+		<< "Lambda: " << GSM2Model_lambda << endl
+		<< "Rd[um]: " <<GSM2Model_rd << endl
+		<< "Rc[um]: " <<GSM2Model_rc << endl
+		<< "kinetic a: " << GSM2_a << endl
+		<< "kinetic b: " << GSM2_b << endl
+		<< "kinetic r: " << GSM2_r <<endl
+		<< "**********************************\n";
+};
+
+TsGSM2::TsGSM2(const TsBinnedSpectrum& spectrum, double Rd, double Rc, double kinA, double kinB, double kinR, string GSM2_ion, double GSM2_LET, bool GetStatisticInfo, int SpectrumUpdateTimes)
+	:GSM2Model_yF(spectrum.yF), GSM2Model_yD(spectrum.yD), GSM2Model_rd(Rd), GSM2Model_rc(Rc), GSM2_a(kinA), GSM2_b(kinB), GSM2_r(kinR), GSM2_ion(GSM2_ion), GSM2_LET(GSM2_LET),
+	fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), ySpectra_F(nullptr)
+{
+	TsSpecificEnergy* zSpectra_D = new TsSpecificEnergy(spectrum.YCenter, spectrum.BinWidth, spectrum.FrequencyDensity, GSM2Model_rd, fGetStatisticInfo, fSpectrumUpdateTimes);
+	fSpecificEnergy_D = zSpectra_D;
+
+	zBinCenter = fSpecificEnergy_D->GetBinCenter();
+	zBinLimit = fSpecificEnergy_D-> GetBinLimit();
+	zBinWidth = fSpecificEnergy_D->GetBinWidth();
+	fzBins = zBinCenter.size();
+
+	zF_D = fSpecificEnergy_D->GetzF();
+	hzfz_cumulative_D = fSpecificEnergy_D->GetHzfzCumulative();
+
+	TsSpecificEnergy* zSpectra_C = new TsSpecificEnergy(spectrum.YCenter, spectrum.BinWidth, spectrum.FrequencyDensity, GSM2Model_rc, fGetStatisticInfo, fSpectrumUpdateTimes);
+	fSpecificEnergy_C = zSpectra_C;
+	zF_C = fSpecificEnergy_C->GetzF();
+	hzfz_cumulative_C = fSpecificEnergy_C -> GetHzfzCumulative();
+
+	double nDBS = CalculateKappaFromLET(GSM2_ion, pow(10,0.01242109 + 0.9922239*log10(GSM2Model_yD)));
+	GSM2Model_kappa = nDBS*pow(GSM2Model_rd/GSM2Model_rc,3);
+	GSM2Model_lambda = GSM2Model_kappa*1e-3;
+
+	cout << "************** GSM2 binned-spectrum mode **************\n"
 		<< "Kappa: " << GSM2Model_kappa <<endl
 		<< "Lambda: " << GSM2Model_lambda << endl
 		<< "Rd[um]: " <<GSM2Model_rd << endl
@@ -147,7 +184,10 @@ void TsGSM2::ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vecto
 	double KappaValue;
 	
 	std::vector<double> TotalContributionParticle(10,0.0);
-	TotalContributionParticle = ySpectra_F -> GetProbabilityContribution();
+	if(ySpectra_F)
+		TotalContributionParticle = ySpectra_F -> GetProbabilityContribution();
+	else
+		TotalContributionParticle[9] = 1.;
 	
 			
 	std::default_random_engine generator;

@@ -28,6 +28,8 @@
 #include <random>
 #include <thread>
 #include <chrono>
+#include <stdexcept>
+#include <algorithm>
 
 //#include "globals.hh"
 //#include "G4RandomDirection.hh"
@@ -35,19 +37,29 @@
 //#include "g4root.hh"
 
 
+namespace {
+
+double SphericalLinealToSpecificEnergyFactor(double radiusUm)
+{
+	if(!(radiusUm > 0.))
+		throw std::runtime_error("Specific-energy conversion requires a positive spherical target radius.");
+
+	return 0.204/(4.*radiusUm*radiusUm);
+}
+
+}
+
 using namespace std;
 
 TsSpecificEnergy::TsSpecificEnergy(std::vector<std::vector<double>> yVector_Particle, double radius, bool GetStatisticInfo, int SpectrumUpdateTimes)
-	:fyVector_Particle(yVector_Particle), fRadius(radius), fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes)
+	:fyVector_Particle(yVector_Particle), fRadius(radius), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetStatisticInfo(GetStatisticInfo), fUseBinnedLinealEnergy(false)
 {
 	//Default parameters
 	zBins = 100;
 	zStart = 0.001;
 	zEnd = 100;
 
-	double pi = 3.1415;
-	double rho = 1; //g/cm3
-	y2z_factor = 0.16/(pi*rho*fRadius*fRadius);
+	y2z_factor = SphericalLinealToSpecificEnergyFactor(fRadius);
 
 
 	InizializeHistograms();
@@ -74,6 +86,23 @@ TsSpecificEnergy::TsSpecificEnergy(std::vector<std::vector<double>> yVector_Part
 
 };
 
+TsSpecificEnergy::TsSpecificEnergy(std::vector<double> yBinCenter, std::vector<double> yBinWidth, std::vector<double> frequencyDensity, double radius, bool GetStatisticInfo, int SpectrumUpdateTimes)
+	:fRadius(radius), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetStatisticInfo(GetStatisticInfo), fUseBinnedLinealEnergy(true), fYBinCenter(yBinCenter), fYBinWidth(yBinWidth), fFrequencyDensity(frequencyDensity)
+{
+	//Default parameters
+	zBins = fYBinCenter.size();
+	zStart = 0.001;
+	zEnd = 100;
+
+	y2z_factor = SphericalLinealToSpecificEnergyFactor(fRadius);
+
+	InizializeHistograms();
+	InitializeStatistic();
+	InitializeStatisticMultievent();
+	SetSpecificEnergySpectraFromBinnedLinealEnergy();
+	GetErrorPropagation();
+};
+
 TsSpecificEnergy::~TsSpecificEnergy()
 {};
 
@@ -91,21 +120,37 @@ void TsSpecificEnergy::InizializeHistograms()
 	hfz_particle = new double *[zBins];
 	for (int i=0; i<zBins; i++)
 		hfz_particle[i] =new double [10];	
+	for (int i=0; i<zBins; i++)
+		for(int particle=0; particle<10; particle++)
+			hfz_particle[i][particle] = 0.;
 
 
 	zMultieventParticleContibution.resize(zBins, std::vector<double>(10,0.));
 
-	zBinLimit[0] = zStart; //lowest z value
-	double zMax = zEnd; //highest z value
-	double step = (log10(zMax) - log10(zStart))/zBins;
-
-	double Binlog = log10(zStart);
-	for (int i=0; i<zBins; i++)
+	if(fUseBinnedLinealEnergy)
 	{
-		Binlog += step;
-		zBinLimit[i+1] = pow(10, Binlog);
-		zBinWidth[i] = zBinLimit[i+1]-zBinLimit[i];
-		zBinCenter[i] = (zBinLimit[i+1]+zBinLimit[i])/2.;
+		zBinLimit[0] = std::max(0., (fYBinCenter[0] - 0.5*fYBinWidth[0])*y2z_factor);
+		for (int i=0; i<zBins; i++)
+		{
+			zBinCenter[i] = fYBinCenter[i]*y2z_factor;
+			zBinWidth[i] = fYBinWidth[i]*y2z_factor;
+			zBinLimit[i+1] = zBinLimit[i] + zBinWidth[i];
+		}
+	}
+	else
+	{
+		zBinLimit[0] = zStart; //lowest z value
+		double zMax = zEnd; //highest z value
+		double step = (log10(zMax) - log10(zStart))/zBins;
+
+		double Binlog = log10(zStart);
+		for (int i=0; i<zBins; i++)
+		{
+			Binlog += step;
+			zBinLimit[i+1] = pow(10, Binlog);
+			zBinWidth[i] = zBinLimit[i+1]-zBinLimit[i];
+			zBinCenter[i] = (zBinLimit[i+1]+zBinLimit[i])/2.;
+		}
 	}
 
 }
@@ -353,6 +398,44 @@ void TsSpecificEnergy::SetSpecificEnergySpectra()
 		hzfz_cumulative[i] /= sum_cumulative;
 };
 
+void TsSpecificEnergy::SetSpecificEnergySpectraFromBinnedLinealEnergy()
+{
+	if(fYBinCenter.size() != fYBinWidth.size() || fYBinCenter.size() != fFrequencyDensity.size())
+		throw std::runtime_error("Cannot build TsSpecificEnergy from mismatched binned lineal-energy vectors.");
+	if(fYBinCenter.empty())
+		throw std::runtime_error("Cannot build TsSpecificEnergy from an empty binned lineal-energy spectrum.");
+
+	for (int i=0; i<zBins; ++i)
+	{
+		if(!(zBinWidth[i] > 0.) || !(fYBinWidth[i] > 0.) || !(fYBinCenter[i] > 0.))
+			throw std::runtime_error("Cannot build TsSpecificEnergy from non-positive binned lineal-energy values.");
+		if(!std::isfinite(fFrequencyDensity[i]) || fFrequencyDensity[i] < 0.)
+			throw std::runtime_error("Cannot build TsSpecificEnergy from invalid frequency-density values.");
+
+		hfz[i] = fFrequencyDensity[i]/y2z_factor;
+		hzfz[i] = zBinCenter[i]*hfz[i];
+
+		std::vector<double> contribution(10,0.);
+		contribution[9] = 1.;
+		zParticleContibution.push_back(contribution);
+	}
+
+	zF = 0.;
+	double cumulative = 0.;
+	for (int i=0; i<zBins; ++i)
+	{
+		zF += hzfz[i]*zBinWidth[i];
+		cumulative += hzfz[i]*zBinWidth[i];
+		hzfz_cumulative[i] = cumulative;
+	}
+
+	if(!(cumulative > 0.) || !std::isfinite(cumulative))
+		throw std::runtime_error("Cannot build TsSpecificEnergy from a binned lineal-energy spectrum with zero dose-weighted integral.");
+
+	for (int i=0; i<zBins; ++i)
+		hzfz_cumulative[i] /= cumulative;
+}
+
 
 void TsSpecificEnergy::ParallelGetHfzMultiEvent(std::vector<std::vector<double>> &zVectorPart, double dose, int NumberOfSamples)
 {
@@ -519,4 +602,3 @@ void TsSpecificEnergy::CalculateMultieventStatisticUncertainty()
 	}
 
 }
-
