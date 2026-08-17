@@ -90,7 +90,10 @@ TsSpecificEnergy::TsSpecificEnergy(std::vector<double> yBinCenter, std::vector<d
 	:fRadius(radius), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetStatisticInfo(GetStatisticInfo), fUseBinnedLinealEnergy(true), fYBinCenter(yBinCenter), fYBinWidth(yBinWidth), fFrequencyDensity(frequencyDensity)
 {
 	//Default parameters
-	zBins = fYBinCenter.size();
+	// Keep the same fixed log-z grid used by event-mode GSM2.
+	// The GSM2 survival integration assumes domain and nucleus spectra share
+	// one z grid; radius-dependent z grids break the normalization.
+	zBins = 100;
 	zStart = 0.001;
 	zEnd = 100;
 
@@ -127,30 +130,17 @@ void TsSpecificEnergy::InizializeHistograms()
 
 	zMultieventParticleContibution.resize(zBins, std::vector<double>(10,0.));
 
-	if(fUseBinnedLinealEnergy)
-	{
-		zBinLimit[0] = std::max(0., (fYBinCenter[0] - 0.5*fYBinWidth[0])*y2z_factor);
-		for (int i=0; i<zBins; i++)
-		{
-			zBinCenter[i] = fYBinCenter[i]*y2z_factor;
-			zBinWidth[i] = fYBinWidth[i]*y2z_factor;
-			zBinLimit[i+1] = zBinLimit[i] + zBinWidth[i];
-		}
-	}
-	else
-	{
-		zBinLimit[0] = zStart; //lowest z value
-		double zMax = zEnd; //highest z value
-		double step = (log10(zMax) - log10(zStart))/zBins;
+	zBinLimit[0] = zStart; //lowest z value
+	double zMax = zEnd; //highest z value
+	double step = (log10(zMax) - log10(zStart))/zBins;
 
-		double Binlog = log10(zStart);
-		for (int i=0; i<zBins; i++)
-		{
-			Binlog += step;
-			zBinLimit[i+1] = pow(10, Binlog);
-			zBinWidth[i] = zBinLimit[i+1]-zBinLimit[i];
-			zBinCenter[i] = (zBinLimit[i+1]+zBinLimit[i])/2.;
-		}
+	double Binlog = log10(zStart);
+	for (int i=0; i<zBins; i++)
+	{
+		Binlog += step;
+		zBinLimit[i+1] = pow(10, Binlog);
+		zBinWidth[i] = zBinLimit[i+1]-zBinLimit[i];
+		zBinCenter[i] = (zBinLimit[i+1]+zBinLimit[i])/2.;
 	}
 
 }
@@ -405,35 +395,69 @@ void TsSpecificEnergy::SetSpecificEnergySpectraFromBinnedLinealEnergy()
 	if(fYBinCenter.empty())
 		throw std::runtime_error("Cannot build TsSpecificEnergy from an empty binned lineal-energy spectrum.");
 
+	zParticleContibution.assign(zBins, std::vector<double>(10, 0.));
 	for (int i=0; i<zBins; ++i)
+		zParticleContibution[i][9] = 1.;
+
+	// Transform the binned f(y) spectrum onto the fixed GSM2 z grid without
+	// sampling synthetic events. Probability is conserved by integrating each
+	// y-bin overlap after z = y * y2z_factor.
+	for (std::size_t yIndex=0; yIndex<fYBinCenter.size(); ++yIndex)
 	{
-		if(!(zBinWidth[i] > 0.) || !(fYBinWidth[i] > 0.) || !(fYBinCenter[i] > 0.))
+		if(!(fYBinWidth[yIndex] > 0.) || !(fYBinCenter[yIndex] > 0.))
 			throw std::runtime_error("Cannot build TsSpecificEnergy from non-positive binned lineal-energy values.");
-		if(!std::isfinite(fFrequencyDensity[i]) || fFrequencyDensity[i] < 0.)
+		if(!std::isfinite(fFrequencyDensity[yIndex]) || fFrequencyDensity[yIndex] < 0.)
 			throw std::runtime_error("Cannot build TsSpecificEnergy from invalid frequency-density values.");
 
-		hfz[i] = fFrequencyDensity[i]/y2z_factor;
-		hzfz[i] = zBinCenter[i]*hfz[i];
+		const double yLow = std::max(0., fYBinCenter[yIndex] - 0.5*fYBinWidth[yIndex]);
+		const double yHigh = fYBinCenter[yIndex] + 0.5*fYBinWidth[yIndex];
+		const double zLow = yLow*y2z_factor;
+		const double zHigh = yHigh*y2z_factor;
+		if(!(zHigh > zLow))
+			continue;
 
-		std::vector<double> contribution(10,0.);
-		contribution[9] = 1.;
-		zParticleContibution.push_back(contribution);
+		for (int zIndex=0; zIndex<zBins; ++zIndex)
+		{
+			const double overlapLow = std::max(zLow, zBinLimit[zIndex]);
+			const double overlapHigh = std::min(zHigh, zBinLimit[zIndex+1]);
+			if(overlapHigh <= overlapLow)
+				continue;
+
+			const double yOverlap = (overlapHigh - overlapLow)/y2z_factor;
+			const double probability = fFrequencyDensity[yIndex]*yOverlap;
+			hfz[zIndex] += probability/zBinWidth[zIndex];
+		}
 	}
 
+	double frequencyIntegral = 0.;
+	for (int i=0; i<zBins; ++i)
+		frequencyIntegral += hfz[i]*zBinWidth[i];
+	if(!(frequencyIntegral > 0.) || !std::isfinite(frequencyIntegral))
+		throw std::runtime_error("Cannot build TsSpecificEnergy from a binned lineal-energy spectrum with zero frequency integral on the z grid.");
+
 	zF = 0.;
+	for (int i=0; i<zBins; ++i)
+	{
+		hfz[i] /= frequencyIntegral;
+		hzfz[i] = zBinCenter[i]*hfz[i];
+		zF += hzfz[i]*zBinWidth[i];
+	}
+
+	if(!(zF > 0.) || !std::isfinite(zF))
+		throw std::runtime_error("Cannot build TsSpecificEnergy from a binned lineal-energy spectrum with zero dose-weighted integral.");
+
 	double cumulative = 0.;
 	for (int i=0; i<zBins; ++i)
 	{
-		zF += hzfz[i]*zBinWidth[i];
-		cumulative += hzfz[i]*zBinWidth[i];
+		cumulative += hfz[i]*zBinWidth[i];
 		hzfz_cumulative[i] = cumulative;
 	}
 
-	if(!(cumulative > 0.) || !std::isfinite(cumulative))
-		throw std::runtime_error("Cannot build TsSpecificEnergy from a binned lineal-energy spectrum with zero dose-weighted integral.");
-
-	for (int i=0; i<zBins; ++i)
-		hzfz_cumulative[i] /= cumulative;
+	if(cumulative > 0.)
+	{
+		for (int i=0; i<zBins; ++i)
+			hzfz_cumulative[i] /= cumulative;
+	}
 }
 
 
@@ -476,13 +500,9 @@ void TsSpecificEnergy::ParallelGetHfzMultiEvent(std::vector<std::vector<double>>
 
 			} //chiudo su poisson nu
 		}//chiudo if()
-		else   
+		else
 		{
-			for(int particle=0; particle<10; particle++)
-			{
-				zMultievent_Particle[particle] += zBinCenter[0]*zParticleContibution[0][particle];
-			}
-
+			// Zero tracks means zero deposited specific energy.
 		}
 
 		zVectorPart[k]= zMultievent_Particle;

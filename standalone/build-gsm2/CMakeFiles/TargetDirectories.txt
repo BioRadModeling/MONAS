@@ -1,0 +1,3 @@
+/Volumes/dtran2$/MONAS/standalone/build-gsm2/CMakeFiles/monas.dir
+/Volumes/dtran2$/MONAS/standalone/build-gsm2/CMakeFiles/edit_cache.dir
+/Volumes/dtran2$/MONAS/standalone/build-gsm2/CMakeFiles/rebuild_cache.dir

@@ -940,13 +940,28 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 //	ofstream fn_Nucleus("fn_Nucleus.csv"); //DEBUG
 //	fn_Nucleus<<"Dose,z,fn"<<endl; //DEBUG
 
-	int Ndomains = std::floor( pow(GSM2_Rn/GSM2_rd,3) );
+	int Ndomains = std::floor( pow(GSM2_Rn/GSM2_rd,2) );
 	//integrro S(zn)
 	//Numero domini = rapporto dei raggi al quadrato.
 	vector<double> S, S_var, RBE, RBE_var;
 	std::vector<std::vector<double>> S_Particle, RBE_Particle;
 	for(double D:Doses)
 	{
+		if(D == 0.)
+		{
+			std::vector<double> scomponent(10, 0.);
+			std::vector<double> rbecomponent(10, 0.);
+			scomponent[9] = 1.;
+			S.push_back(1.);
+			RBE.push_back(0.);
+			S_Particle.push_back(scomponent);
+			RBE_Particle.push_back(rbecomponent);
+			S_var.push_back(0.);
+			RBE_var.push_back(0.);
+			update++;
+			continue;
+		}
+
 		std::vector<double>  multieventNucleus = aGSM2 -> GetMultieventNucleus(D, MCMultieventIterations); //Array di zfz Vs z //DEVE AVERE IL BINCENTER DELLE Zn
 		std::vector<double> multieventNucleus_var = aGSM2 -> GetMultieventNucleusVariance();
 		std::vector<std::vector<double>> multieventNucleusParticleContribution = aGSM2 -> GetMultieventNucleusParticleContribution();
@@ -971,7 +986,7 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 		double rbe = 0., rbe_var = 0.;
 		if(D>0)
 		{ 
-			rbe = (1/(2*D))*((alphaX/betaX)+sqrt((pow(alphaX,2)/pow(betaX,2))-4*log(s)));
+			rbe = (sqrt((alphaX*alphaX) - (4*betaX*log(s))) - alphaX)/(2*betaX*D);
 			rbe_var = (1./(pow(D*s,2)*(alphaX*alphaX-4*betaX*log(s))))*s_var;
 
 			for(int comp=0; comp<10; comp++)

@@ -220,7 +220,7 @@ void TsGSM2::ParallelGetInitialLethalNonLethalDamages(vector<double> &p0x, vecto
 			} //chiudo su poisson nu
 		}//chiudo if()
 		else
-			z_tot = zBinCenter[0]; //CHIUDERE
+			z_tot = 0.;
 		
 		//PASSAGGIO 3
 		//ESTRAGGO I DANNI DA TUTTE LE TRACCE
