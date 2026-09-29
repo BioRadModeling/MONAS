@@ -28,6 +28,8 @@
 #include <random>
 #include <thread>
 #include <chrono>
+#include <stdexcept>
+#include <algorithm>
 
 //#include "globals.hh"
 //#include "G4RandomDirection.hh"
@@ -35,19 +37,29 @@
 //#include "g4root.hh"
 
 
+namespace {
+
+double SphericalLinealToSpecificEnergyFactor(double radiusUm)
+{
+	if(!(radiusUm > 0.))
+		throw std::runtime_error("Specific-energy conversion requires a positive spherical target radius.");
+
+	return 0.204/(4.*radiusUm*radiusUm);
+}
+
+}
+
 using namespace std;
 
 TsSpecificEnergy::TsSpecificEnergy(std::vector<std::vector<double>> yVector_Particle, double radius, bool GetStatisticInfo, int SpectrumUpdateTimes)
-	:fyVector_Particle(yVector_Particle), fRadius(radius), fGetStatisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes)
+	:fyVector_Particle(yVector_Particle), fRadius(radius), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetStatisticInfo(GetStatisticInfo), fUseBinnedLinealEnergy(false)
 {
 	//Default parameters
 	zBins = 100;
 	zStart = 0.001;
 	zEnd = 100;
 
-	double pi = 3.1415;
-	double rho = 1; //g/cm3
-	y2z_factor = 0.16/(pi*rho*fRadius*fRadius);
+	y2z_factor = SphericalLinealToSpecificEnergyFactor(fRadius);
 
 
 	InizializeHistograms();
@@ -74,6 +86,26 @@ TsSpecificEnergy::TsSpecificEnergy(std::vector<std::vector<double>> yVector_Part
 
 };
 
+TsSpecificEnergy::TsSpecificEnergy(std::vector<double> yBinCenter, std::vector<double> yBinWidth, std::vector<double> frequencyDensity, double radius, bool GetStatisticInfo, int SpectrumUpdateTimes)
+	:fRadius(radius), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetStatisticInfo(GetStatisticInfo), fUseBinnedLinealEnergy(true), fYBinCenter(yBinCenter), fYBinWidth(yBinWidth), fFrequencyDensity(frequencyDensity)
+{
+	//Default parameters
+	// Keep the same fixed log-z grid used by event-mode GSM2.
+	// The GSM2 survival integration assumes domain and nucleus spectra share
+	// one z grid; radius-dependent z grids break the normalization.
+	zBins = 100;
+	zStart = 0.001;
+	zEnd = 100;
+
+	y2z_factor = SphericalLinealToSpecificEnergyFactor(fRadius);
+
+	InizializeHistograms();
+	InitializeStatistic();
+	InitializeStatisticMultievent();
+	SetSpecificEnergySpectraFromBinnedLinealEnergy();
+	GetErrorPropagation();
+};
+
 TsSpecificEnergy::~TsSpecificEnergy()
 {};
 
@@ -91,6 +123,9 @@ void TsSpecificEnergy::InizializeHistograms()
 	hfz_particle = new double *[zBins];
 	for (int i=0; i<zBins; i++)
 		hfz_particle[i] =new double [10];	
+	for (int i=0; i<zBins; i++)
+		for(int particle=0; particle<10; particle++)
+			hfz_particle[i][particle] = 0.;
 
 
 	zMultieventParticleContibution.resize(zBins, std::vector<double>(10,0.));
@@ -353,6 +388,78 @@ void TsSpecificEnergy::SetSpecificEnergySpectra()
 		hzfz_cumulative[i] /= sum_cumulative;
 };
 
+void TsSpecificEnergy::SetSpecificEnergySpectraFromBinnedLinealEnergy()
+{
+	if(fYBinCenter.size() != fYBinWidth.size() || fYBinCenter.size() != fFrequencyDensity.size())
+		throw std::runtime_error("Cannot build TsSpecificEnergy from mismatched binned lineal-energy vectors.");
+	if(fYBinCenter.empty())
+		throw std::runtime_error("Cannot build TsSpecificEnergy from an empty binned lineal-energy spectrum.");
+
+	zParticleContibution.assign(zBins, std::vector<double>(10, 0.));
+	for (int i=0; i<zBins; ++i)
+		zParticleContibution[i][9] = 1.;
+
+	// Transform the binned f(y) spectrum onto the fixed GSM2 z grid without
+	// sampling synthetic events. Probability is conserved by integrating each
+	// y-bin overlap after z = y * y2z_factor.
+	for (std::size_t yIndex=0; yIndex<fYBinCenter.size(); ++yIndex)
+	{
+		if(!(fYBinWidth[yIndex] > 0.) || !(fYBinCenter[yIndex] > 0.))
+			throw std::runtime_error("Cannot build TsSpecificEnergy from non-positive binned lineal-energy values.");
+		if(!std::isfinite(fFrequencyDensity[yIndex]) || fFrequencyDensity[yIndex] < 0.)
+			throw std::runtime_error("Cannot build TsSpecificEnergy from invalid frequency-density values.");
+
+		const double yLow = std::max(0., fYBinCenter[yIndex] - 0.5*fYBinWidth[yIndex]);
+		const double yHigh = fYBinCenter[yIndex] + 0.5*fYBinWidth[yIndex];
+		const double zLow = yLow*y2z_factor;
+		const double zHigh = yHigh*y2z_factor;
+		if(!(zHigh > zLow))
+			continue;
+
+		for (int zIndex=0; zIndex<zBins; ++zIndex)
+		{
+			const double overlapLow = std::max(zLow, zBinLimit[zIndex]);
+			const double overlapHigh = std::min(zHigh, zBinLimit[zIndex+1]);
+			if(overlapHigh <= overlapLow)
+				continue;
+
+			const double yOverlap = (overlapHigh - overlapLow)/y2z_factor;
+			const double probability = fFrequencyDensity[yIndex]*yOverlap;
+			hfz[zIndex] += probability/zBinWidth[zIndex];
+		}
+	}
+
+	double frequencyIntegral = 0.;
+	for (int i=0; i<zBins; ++i)
+		frequencyIntegral += hfz[i]*zBinWidth[i];
+	if(!(frequencyIntegral > 0.) || !std::isfinite(frequencyIntegral))
+		throw std::runtime_error("Cannot build TsSpecificEnergy from a binned lineal-energy spectrum with zero frequency integral on the z grid.");
+
+	zF = 0.;
+	for (int i=0; i<zBins; ++i)
+	{
+		hfz[i] /= frequencyIntegral;
+		hzfz[i] = zBinCenter[i]*hfz[i];
+		zF += hzfz[i]*zBinWidth[i];
+	}
+
+	if(!(zF > 0.) || !std::isfinite(zF))
+		throw std::runtime_error("Cannot build TsSpecificEnergy from a binned lineal-energy spectrum with zero dose-weighted integral.");
+
+	double cumulative = 0.;
+	for (int i=0; i<zBins; ++i)
+	{
+		cumulative += hfz[i]*zBinWidth[i];
+		hzfz_cumulative[i] = cumulative;
+	}
+
+	if(cumulative > 0.)
+	{
+		for (int i=0; i<zBins; ++i)
+			hzfz_cumulative[i] /= cumulative;
+	}
+}
+
 
 void TsSpecificEnergy::ParallelGetHfzMultiEvent(std::vector<std::vector<double>> &zVectorPart, double dose, int NumberOfSamples)
 {
@@ -393,13 +500,9 @@ void TsSpecificEnergy::ParallelGetHfzMultiEvent(std::vector<std::vector<double>>
 
 			} //chiudo su poisson nu
 		}//chiudo if()
-		else   
+		else
 		{
-			for(int particle=0; particle<10; particle++)
-			{
-				zMultievent_Particle[particle] += zBinCenter[0]*zParticleContibution[0][particle];
-			}
-
+			// Zero tracks means zero deposited specific energy.
 		}
 
 		zVectorPart[k]= zMultievent_Particle;
@@ -519,4 +622,3 @@ void TsSpecificEnergy::CalculateMultieventStatisticUncertainty()
 	}
 
 }
-

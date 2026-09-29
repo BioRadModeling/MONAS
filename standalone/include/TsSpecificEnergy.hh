@@ -40,6 +40,7 @@ class TsSpecificEnergy
 {
 	public:
 		TsSpecificEnergy(std::vector<std::vector<double>> yVector_Particle, double radius, bool GetStatisticInfo, int SpectrumUpdateTimes);
+		TsSpecificEnergy(std::vector<double> yBinCenter, std::vector<double> yBinWidth, std::vector<double> frequencyDensity, double radius, bool GetStatisticInfo, int SpectrumUpdateTimes);
 		~TsSpecificEnergy();
 
 		void InizializeHistograms();
@@ -51,6 +52,7 @@ class TsSpecificEnergy
 		void GetErrorPropagation();
 		void GetErrorPropagationMultievent();
 		void SetSpecificEnergySpectra();
+		void SetSpecificEnergySpectraFromBinnedLinealEnergy();
 
 
 		std::vector<double> GetBinCenter(){return zBinCenter;};
@@ -108,6 +110,10 @@ class TsSpecificEnergy
 		double **hfz_particle;
 
 		double zF, zF_var, zF_std;
+		bool fUseBinnedLinealEnergy;
+		std::vector<double> fYBinCenter;
+		std::vector<double> fYBinWidth;
+		std::vector<double> fFrequencyDensity;
 };
 
 

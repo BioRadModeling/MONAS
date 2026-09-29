@@ -205,6 +205,7 @@ void WriteBinnedModeManifest(const string& outputDirectory,
                              bool MKMSatCorrFlag,
                              bool MKMnonPoissFlag,
                              bool SMKMFlag,
+                             bool GSM2Flag,
                              const vector<double>& Doses,
                              double MKModel_alpha0,
                              double MKModel_beta,
@@ -239,6 +240,8 @@ void WriteBinnedModeManifest(const string& outputDirectory,
 		manifest << "- MKM_nonPoisson\n";
 	if(SMKMFlag)
 		manifest << "- SMKM\n";
+	if(GSM2Flag)
+		manifest << "- GSM2\n";
 
 	manifest << "\nDose macro: " << Doses[0] << " " << Doses[1] << " " << Doses[2] << "\n";
 	manifest << "\nMKM parameters:\n";
@@ -394,8 +397,8 @@ int main(int argc, char *argv[])
 				<<"           name:topas:ySpecfile.txt" <<endl
 				<<"           name:amf:spectra.csv:moments.csv:x,y,z" <<endl
 				<<"-outputDir: directory for output files; deterministic-spectrum mode also writes MKM_from_spectra_summary.csv and MKM_from_spectra_manifest.txt" <<endl
-				<<"-MKMSatCorr/-MKMnonPoiss/-SMKM: deterministic-spectrum MKM models; defaults to -MKMSatCorr when none is selected" <<endl
-				<<"-DSMKM/-GSM2: not available with -MKMFromSpectra" <<endl
+				<<"-MKMSatCorr/-MKMnonPoiss/-SMKM/-GSM2: deterministic-spectrum radiobiology models; defaults to -MKMSatCorr when none is selected" <<endl
+				<<"-DSMKM: not available with -MKMFromSpectra" <<endl
 				<<"-Doses: (initial dose value) (final dose value) (step value)" <<endl
 				<<"-help: list of definitions and inputs" <<endl;
 			return 0;			     
@@ -439,9 +442,7 @@ int main(int argc, char *argv[])
 				throw runtime_error("-MKMFromSpectra requires at least one -spectrum argument.");
 			if(DSMKMFlag)
 				throw runtime_error("DSMKM is not available in deterministic binned-spectrum mode yet.");
-			if(GSM2Flag)
-				throw runtime_error("GSM2 is not available in deterministic binned-spectrum mode yet.");
-			if(!MKMSatCorrFlag && !MKMnonPoissFlag && !SMKMFlag)
+			if(!MKMSatCorrFlag && !MKMnonPoissFlag && !SMKMFlag && !GSM2Flag)
 				MKMSatCorrFlag = true;
 
 			EnsureDirectory(OutputDirectory);
@@ -450,7 +451,7 @@ int main(int argc, char *argv[])
 			if(!summary)
 				throw runtime_error("Cannot write summary file: " + summaryPath);
 			summary << "source,model,dose_Gy,survival,survival_std,RBE,RBE_std,yF_keV_per_um,yD_keV_per_um\n";
-			WriteBinnedModeManifest(OutputDirectory, argc, argv, SpectrumSpecs, MKMSatCorrFlag, MKMnonPoissFlag, SMKMFlag, Doses, MKModel_alpha0, MKModel_beta, MKModel_alphaX, MKModel_betaX, MKModel_rd, MKModel_Rn, MKModel_y0);
+			WriteBinnedModeManifest(OutputDirectory, argc, argv, SpectrumSpecs, MKMSatCorrFlag, MKMnonPoissFlag, SMKMFlag, GSM2Flag, Doses, MKModel_alpha0, MKModel_beta, MKModel_alphaX, MKModel_betaX, MKModel_rd, MKModel_Rn, MKModel_y0);
 
 			cout << "\nRunning deterministic binned-spectrum MKM mode\n";
 			cout << "Output directory: " << OutputDirectory << endl;
@@ -483,6 +484,20 @@ int main(int argc, char *argv[])
 				if(SMKMFlag)
 				{
 					calculator.GetSurvWithSMKModel();
+					AppendSummaryRows(summary, spectrum, calculator);
+				}
+				if(GSM2Flag)
+				{
+					calculator.SetGSM2_alphaX(GSM2_alphaX);
+					calculator.SetGSM2_betaX(GSM2_betaX);
+					calculator.SetGSM2_rd(GSM2_rd);
+					calculator.SetGSM2_Rn(GSM2_Rn);
+					calculator.SetGSM2_a(GSM2_a);
+					calculator.SetGSM2_b(GSM2_b);
+					calculator.SetGSM2_r(GSM2_r);
+					calculator.SetGSM2_ion(GSM2_ion);
+					calculator.SetGSM2_LET(GSM2_LET);
+					calculator.GetSurvWithGSM2();
 					AppendSummaryRows(summary, spectrum, calculator);
 				}
 			}

@@ -866,12 +866,25 @@ void TsGetSurvivalRBEQualityFactor::GetQualityFactorWithKellereHahn()
 
 void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 {
-	if(!fOwnedBinCenter.empty())
-		throw std::runtime_error("GSM2 is not available for deterministic binned-spectrum input yet.");
-
 	double alphaX = GSM2_alphaX;
 	double betaX = GSM2_betaX;
-	TsGSM2* aGSM2 = new TsGSM2(yF, yD, GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_ion, GSM2_LET, fyVector, fyVector_Particle, fyVector_Nucleus, fyVector_Particle_Nucleus, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	TsGSM2* aGSM2 = nullptr;
+	if(!fOwnedBinCenter.empty())
+	{
+		TsBinnedSpectrum spectrum;
+		spectrum.SourceName = fSpectrumSourceName;
+		spectrum.YCenter = fOwnedBinCenter;
+		spectrum.BinWidth = fOwnedBinWidth;
+		spectrum.FrequencyDensity = fOwnedFy;
+		spectrum.DoseDensity = fOwnedDy;
+		spectrum.yF = yF;
+		spectrum.yD = yD;
+		aGSM2 = new TsGSM2(spectrum, GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_ion, GSM2_LET, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	}
+	else
+	{
+		aGSM2 = new TsGSM2(yF, yD, GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_ion, GSM2_LET, fyVector, fyVector_Particle, fyVector_Nucleus, fyVector_Particle_Nucleus, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	}
 	cout << MCMultieventIterations << endl;
 	vector<double> zBinCenter = aGSM2->GetZn();
 	vector<double> zBinWidth = aGSM2->GetzBinWidth();
@@ -934,6 +947,21 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 	std::vector<std::vector<double>> S_Particle, RBE_Particle;
 	for(double D:Doses)
 	{
+		if(D == 0.)
+		{
+			std::vector<double> scomponent(10, 0.);
+			std::vector<double> rbecomponent(10, 0.);
+			scomponent[9] = 1.;
+			S.push_back(1.);
+			RBE.push_back(0.);
+			S_Particle.push_back(scomponent);
+			RBE_Particle.push_back(rbecomponent);
+			S_var.push_back(0.);
+			RBE_var.push_back(0.);
+			update++;
+			continue;
+		}
+
 		std::vector<double>  multieventNucleus = aGSM2 -> GetMultieventNucleus(D, MCMultieventIterations); //Array di zfz Vs z //DEVE AVERE IL BINCENTER DELLE Zn
 		std::vector<double> multieventNucleus_var = aGSM2 -> GetMultieventNucleusVariance();
 		std::vector<std::vector<double>> multieventNucleusParticleContribution = aGSM2 -> GetMultieventNucleusParticleContribution();
@@ -1126,6 +1154,13 @@ void TsGetSurvivalRBEQualityFactor::WriteMKMSurvival(string filename, std::vecto
 
 void TsGetSurvivalRBEQualityFactor::WriteGSM2Survival(string filename, std::vector<double> D, std::vector<double> S, std::vector<double> Svar, std::vector<double> RBE, std::vector<double> RBEvar)
 {
+	fLastModelName = "GSM2";
+	fLastDoses = D;
+	fLastSurvival = S;
+	fLastSurvivalVariance = Svar;
+	fLastRBE = RBE;
+	fLastRBEVariance = RBEvar;
+
 	const string outputPath = GetOutputPath(filename);
 	std::ofstream output(outputPath);
 	output << "# GSM2 Parameters\n#\n";
