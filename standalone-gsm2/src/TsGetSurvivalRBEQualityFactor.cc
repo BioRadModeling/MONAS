@@ -47,13 +47,13 @@ double FiniteStdDev(double variance)
 } // namespace
 
 TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(std::vector<std::vector<double>> yParticleContribution, std::vector<double> yVector, std::vector<std::vector<double>> yVector_Particle, std::vector<double> yVector_Nucleus, std::vector<std::vector<double>> yVector_Particle_Nucleus, double*hBinLimit, double* hBinWidth,  double* hfy,double* hdy, double hyF, double hyD, double hyF_var, double hyD_var, std::vector<double> hfy_var, std::vector<double> hdy_var, int SpecLength, bool GetStatisticInfo, int SpectrumUpdateTimes, bool GetParticleContribution)
-	:fyParticleContribution(yParticleContribution), fyVector(yVector),fyVector_Particle(yVector_Particle), fyVector_Nucleus(yVector_Nucleus), fyVector_Particle_Nucleus(yVector_Particle_Nucleus), fBinLimit(hBinLimit), fBinWidth(hBinWidth), fhfy(hfy), fhdy(hdy), yF(hyF), yD(hyD), yF_var(hyF_var), yD_var(hyD_var), fy_var(hfy_var), dy_var(hdy_var),fSpecLength(SpecLength), fGetStatitisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetParticleContribution(GetParticleContribution)
+	:fyParticleContribution(yParticleContribution), fyVector(yVector),fyVector_Particle(yVector_Particle), fyVector_Nucleus(yVector_Nucleus), fyVector_Particle_Nucleus(yVector_Particle_Nucleus), fBinLimit(hBinLimit), fBinWidth(hBinWidth), fhfy(hfy), fhdy(hdy), yF(hyF), yD(hyD), yF_var(hyF_var), yD_var(hyD_var), fy_var(hfy_var), dy_var(hdy_var),fSpecLength(SpecLength), fGetStatitisticInfo(GetStatisticInfo), fSpectrumUpdateTimes(SpectrumUpdateTimes), fGetParticleContribution(GetParticleContribution), fHasBinnedSpectrum(false)
 {
 	InitializeDefaultParameters();
 };
 
 TsGetSurvivalRBEQualityFactor::TsGetSurvivalRBEQualityFactor(const TsBinnedSpectrum& spectrum)
-	:fGetStatitisticInfo(false), fSpectrumUpdateTimes(1), fGetParticleContribution(false), MCMultieventIterations(1e5), fBinLimit(0), fBinWidth(0), fhy(0), fhfy(0), fhdy(0), fhydy(0), yF(spectrum.yF), yF_var(0.0), yD(spectrum.yD), yD_var(0.0), fSpectrumSourceName(spectrum.SourceName), fSpecLength(0)
+	:fGetStatitisticInfo(false), fSpectrumUpdateTimes(1), fGetParticleContribution(false), MCMultieventIterations(1e5), fBinLimit(0), fBinWidth(0), fhy(0), fhfy(0), fhdy(0), fhydy(0), yF(spectrum.yF), yF_var(0.0), yD(spectrum.yD), yD_var(0.0), fSpectrumSourceName(spectrum.SourceName), fBinnedSpectrum(spectrum), fHasBinnedSpectrum(true), fSpecLength(0)
 {
 	if(spectrum.YCenter.empty())
 		throw std::runtime_error("Cannot build MKM calculator from an empty binned spectrum.");
@@ -128,6 +128,7 @@ void TsGetSurvivalRBEQualityFactor::InitializeDefaultParameters()
 	GSM2_betaX 	= 0.05;
 	GSM2_ion 	= "H";
 	GSM2_LET 	= 10.0; //keV/um
+	GSM2_nDomains 	= 0; //0 = use the (Rn/rd)^2 formula
 	//Macroscopic Doses
 	Doses = {0,1,2,3,4,5,6,7,8,9,10}; //Unit:Gy
 
@@ -866,12 +867,13 @@ void TsGetSurvivalRBEQualityFactor::GetQualityFactorWithKellereHahn()
 
 void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 {
-	if(!fOwnedBinCenter.empty())
-		throw std::runtime_error("GSM2 is not available for deterministic binned-spectrum input yet.");
-
 	double alphaX = GSM2_alphaX;
 	double betaX = GSM2_betaX;
-	TsGSM2* aGSM2 = new TsGSM2(yF, yD, GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_ion, GSM2_LET, fyVector, fyVector_Particle, fyVector_Nucleus, fyVector_Particle_Nucleus, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	TsGSM2* aGSM2 = 0;
+	if(fHasBinnedSpectrum)
+		aGSM2 = new TsGSM2(yF, yD, GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_ion, GSM2_LET, fBinnedSpectrum, fGetStatitisticInfo, fSpectrumUpdateTimes);
+	else
+		aGSM2 = new TsGSM2(yF, yD, GSM2_rd, GSM2_Rn, GSM2_a, GSM2_b, GSM2_r, GSM2_ion, GSM2_LET, fyVector, fyVector_Particle, fyVector_Nucleus, fyVector_Particle_Nucleus, fGetStatitisticInfo, fSpectrumUpdateTimes);
 	cout << MCMultieventIterations << endl;
 	vector<double> zBinCenter = aGSM2->GetZn();
 	vector<double> zBinWidth = aGSM2->GetzBinWidth();
@@ -927,7 +929,8 @@ void TsGetSurvivalRBEQualityFactor::GetSurvWithGSM2()
 //	ofstream fn_Nucleus("fn_Nucleus.csv"); //DEBUG
 //	fn_Nucleus<<"Dose,z,fn"<<endl; //DEBUG
 
-	int Ndomains = std::floor( pow(GSM2_Rn/GSM2_rd,2) );
+	int Ndomains = (GSM2_nDomains > 0) ? GSM2_nDomains : std::floor( pow(GSM2_Rn/GSM2_rd,2) );
+	std::cout << "Number of domains per nucleus: " << Ndomains << std::endl;
 	//integrro S(zn)
 	//Numero domini = rapporto dei raggi al quadrato.
 	vector<double> S, S_var, RBE, RBE_var;
@@ -1126,6 +1129,13 @@ void TsGetSurvivalRBEQualityFactor::WriteMKMSurvival(string filename, std::vecto
 
 void TsGetSurvivalRBEQualityFactor::WriteGSM2Survival(string filename, std::vector<double> D, std::vector<double> S, std::vector<double> Svar, std::vector<double> RBE, std::vector<double> RBEvar)
 {
+	fLastModelName = "GSM2";
+	fLastDoses = D;
+	fLastSurvival = S;
+	fLastSurvivalVariance = Svar;
+	fLastRBE = RBE;
+	fLastRBEVariance = RBEvar;
+
 	const string outputPath = GetOutputPath(filename);
 	std::ofstream output(outputPath);
 	output << "# GSM2 Parameters\n#\n";
